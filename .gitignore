@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+.venv/
+benchmark_logs/*.log
+*.tmp
+*.bak

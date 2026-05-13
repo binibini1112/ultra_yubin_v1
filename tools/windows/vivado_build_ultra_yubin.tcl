@@ -1,7 +1,7 @@
 # Vivado batch build for ultra_yubin PL goal compute project.
 #
 # Usage:
-#   vivado -mode batch -source vivado_build_ultra_yubin.tcl -tclargs <project_root> <project_name> <pl_goal_compute_axi.v>
+#   vivado -mode batch -source vivado_build_ultra_yubin.tcl -tclargs <project_root> <project_name> <pl_goal_compute_axi.v> [pl_goal_compute_axi_tb.v]
 
 proc fail {msg} {
     puts stderr "BUILD_ERROR: $msg"
@@ -15,11 +15,16 @@ if {$argc < 3} {
 set project_root [lindex $argv 0]
 set project_name [lindex $argv 1]
 set rtl [lindex $argv 2]
+set tb ""
+if {$argc >= 4} {
+    set tb [lindex $argv 3]
+}
 set part_name "xczu3eg-sbva484-1-i"
 set xpr "$project_root/$project_name.xpr"
 set board_part ""
 
 if {![file exists $rtl]} { fail "RTL not found: $rtl" }
+if {$tb ne "" && ![file exists $tb]} { fail "testbench not found: $tb" }
 file mkdir $project_root
 
 puts "===== OPEN / CREATE PROJECT ====="
@@ -63,6 +68,36 @@ if {[string first {ADDR_TRACK_CMD} $txt] < 0} {
     fail "RTL does not contain ADDR_TRACK_CMD"
 }
 update_compile_order -fileset sources_1
+
+if {$tb ne ""} {
+    puts "===== RTL SIMULATION ====="
+    if {[llength [get_files -quiet $tb]] == 0} {
+        add_files -fileset sim_1 $tb
+    }
+    set_property top pl_goal_compute_axi_tb [get_filesets sim_1]
+    set_property top_lib xil_defaultlib [get_filesets sim_1]
+    update_compile_order -fileset sim_1
+    set_property -name {xsim.simulate.runtime} -value {all} -objects [get_filesets sim_1]
+    set sim_dir "$project_root/$project_name.sim/sim_1/behav/xsim"
+    set sim_pass "$sim_dir/pl_goal_compute_axi_tb.pass"
+    if {[file exists $sim_pass]} {
+        file delete -force $sim_pass
+    }
+    launch_simulation -simset sim_1 -mode behavioral
+    if {![file exists $sim_pass]} {
+        close_sim
+        fail "RTL simulation did not create pass sentinel: $sim_pass"
+    }
+    set fp [open $sim_pass r]
+    set sim_txt [read $fp]
+    close $fp
+    if {[string first {TB_PASS: pl_goal_compute_axi AXI register and track path} $sim_txt] < 0} {
+        close_sim
+        fail "RTL simulation pass sentinel did not contain TB_PASS"
+    }
+    close_sim
+    puts "RTL_SIM=PASS"
+}
 
 puts "===== CREATE / UPDATE BLOCK DESIGN ====="
 create_bd_design design_1
@@ -154,6 +189,29 @@ foreach p [get_bd_pins -quiet -filter {TYPE == clk && DIR == I} /zynq_ultra_ps_e
         catch {connect_bd_net [get_bd_pins /zynq_ultra_ps_e_0/pl_clk0] $p}
     }
 }
+
+puts "===== FORCE PL AXI RESET DEASSERTED ====="
+set rst_const [get_bd_cells -quiet /pl_axi_resetn_const]
+if {[llength $rst_const] == 0} {
+    set rst_const [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 pl_axi_resetn_const]
+}
+set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {1}] $rst_const
+foreach rst_pin {
+    /pl_goal_compute_axi_pl/s_axi_aresetn
+    /ps8_0_axi_periph/ARESETN
+    /ps8_0_axi_periph/S00_ARESETN
+    /ps8_0_axi_periph/M00_ARESETN
+} {
+    if {[llength [get_bd_pins -quiet $rst_pin]] != 0} {
+        set rst_net [get_bd_nets -quiet -of_objects [get_bd_pins $rst_pin]]
+        if {[llength $rst_net] != 0} {
+            catch {disconnect_bd_net $rst_net [get_bd_pins $rst_pin]} disconnect_rst_msg
+        }
+        catch {connect_bd_net [get_bd_pins /pl_axi_resetn_const/dout] [get_bd_pins $rst_pin]} connect_rst_msg
+        if {$connect_rst_msg ne ""} { puts "WARN: reset connect message for $rst_pin: $connect_rst_msg" }
+    }
+}
+
 validate_bd_design
 save_bd_design
 set_property synth_checkpoint_mode None [get_files design_1.bd]

@@ -29,6 +29,7 @@ $Stamp = Get-Date -Format "yyyyMMdd_HHmmss"
 $LocalTools = Join-Path $ProjectRoot "codex_tools"
 $BuildTcl = Join-Path $LocalTools "vivado_build_ultra_yubin.tcl"
 $Rtl = Join-Path $ProjectRoot "rtl\pl_goal_compute_axi.v"
+$Tb = Join-Path $ProjectRoot "tb\pl_goal_compute_axi_tb.v"
 $Bit = Join-Path $ProjectRoot "$ProjectName.runs\impl_1\design_1_wrapper.bit"
 $Log = Join-Path $LocalTools "vivado_ultra_yubin_$Stamp.log"
 $JetsonTarget = "${JetsonUser}@${JetsonHost}"
@@ -36,6 +37,7 @@ $JetsonTarget = "${JetsonUser}@${JetsonHost}"
 New-Item -ItemType Directory -Force -Path $ProjectRoot | Out-Null
 New-Item -ItemType Directory -Force -Path $LocalTools | Out-Null
 New-Item -ItemType Directory -Force -Path (Split-Path $Rtl -Parent) | Out-Null
+New-Item -ItemType Directory -Force -Path (Split-Path $Tb -Parent) | Out-Null
 
 if (!(Test-Path $VivadoSettings)) { Die "Vivado settings not found: $VivadoSettings" }
 
@@ -44,6 +46,7 @@ Invoke-External "ssh" @($JetsonTarget, "mkdir -p ${JetsonRoot}/benchmark_logs ${
 Write-Host "===== FETCH RTL / TCL FROM JETSON ====="
 Invoke-External "scp" @("$($JetsonTarget):${JetsonRoot}/tools/windows/vivado_build_ultra_yubin.tcl", "$BuildTcl") 2
 Invoke-External "scp" @("$($JetsonTarget):${JetsonRoot}/hardware/pl_goal_compute/rtl/pl_goal_compute_axi.v", "$Rtl") 2
+Invoke-External "scp" @("$($JetsonTarget):${JetsonRoot}/hardware/pl_goal_compute/tb/pl_goal_compute_axi_tb.v", "$Tb") 2
 
 if ($Clean) {
     Write-Host "===== CLEAN OLD VIVADO PROJECT OUTPUT ====="
@@ -66,7 +69,7 @@ if ($Clean) {
 }
 
 Write-Host "===== RUN VIVADO BUILD ====="
-$VivadoCmd = "call `"$VivadoSettings`" && vivado -mode batch -source `"$BuildTcl`" -tclargs `"$ProjectRoot`" `"$ProjectName`" `"$Rtl`""
+$VivadoCmd = "call `"$VivadoSettings`" && vivado -mode batch -source `"$BuildTcl`" -tclargs `"$ProjectRoot`" `"$ProjectName`" `"$Rtl`" `"$Tb`""
 cmd.exe /c "$VivadoCmd" 2>&1 | Tee-Object -FilePath $Log
 if ($LASTEXITCODE -ne 0) {
     Invoke-External "scp" @("$Log", "$($JetsonTarget):${JetsonRoot}/benchmark_logs/vivado_ultra_yubin_$Stamp.log") 2

@@ -9,14 +9,18 @@ PORT="${ULTRA_YUBIN_PORT:-5016}"
 BASE="${ULTRA_YUBIN_BASE:-0xA0000000}"
 PAN_ID="${PAN_ID:-1}"
 TILT_ID="${TILT_ID:-2}"
-SERIAL="${ULTRA_YUBIN_SERIAL:-/dev/ttyUSB0}"
+SERIAL="${ULTRA_YUBIN_SERIAL:-auto}"
 BAUD="${ULTRA_YUBIN_BAUD:-57600}"
+PROFILE_ACCEL="${ULTRA_YUBIN_PROFILE_ACCEL:-90}"
+PROFILE_VELOCITY="${ULTRA_YUBIN_PROFILE_VELOCITY:-280}"
+CENTER_FILE="${ULTRA_YUBIN_CENTER_FILE:-/home/xilinx/ultra_yubin/front_center.env}"
 DRY_RUN="${ULTRA_YUBIN_DRY_RUN:-auto}"
 NO_PL="${ULTRA_YUBIN_NO_PL:-1}"
 RESTART="${ULTRA_YUBIN_RESTART:-0}"
 SKIP_CHECK="${ULTRA_YUBIN_SKIP_CHECK:-1}"
 SKIP_PL_LOAD="${ULTRA_YUBIN_SKIP_PL_LOAD:-1}"
 SKIP_PL_INIT="${ULTRA_YUBIN_SKIP_PL_INIT:-1}"
+SKIP_DXL_INIT="${ULTRA_YUBIN_SKIP_DXL_INIT:-0}"
 LAZY_PL_OPEN="${ULTRA_YUBIN_LAZY_PL_OPEN:-1}"
 SUDO_PASS="${ULTRA96_SUDO_PASSWORD:-xilinx}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -39,6 +43,9 @@ printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' rm -f \
 printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' systemctl daemon-reload"
 
 SERVICE_ACTIVE="$(ssh "${USER}@${HOST}" "systemctl is-active '${SERVICE}' 2>/dev/null || true" | tr -d '\r')"
+if [ "${SERIAL}" = "auto" ]; then
+  SERIAL="$(ssh "${USER}@${HOST}" "set -- /dev/serial/by-id/*FTDI* /dev/serial/by-id/*Serial* /dev/ttyUSB* /dev/ttyACM*; for p in \"\$@\"; do [ -e \"\$p\" ] && { echo \"\$p\"; exit 0; }; done; echo /dev/ttyUSB0" | tr -d '\r')"
+fi
 SERIAL_PRESENT="$(ssh "${USER}@${HOST}" "test -e '${SERIAL}' && echo 1 || echo 0" | tr -d '\r')"
 
 EFFECTIVE_DRY_RUN="${DRY_RUN}"
@@ -56,7 +63,7 @@ if [ "${NO_PL}" = "auto" ]; then
 fi
 
 echo "[ultra-yubin] service=${SERVICE_ACTIVE:-inactive} serial_present=${SERIAL_PRESENT} dry=${EFFECTIVE_DRY_RUN} no_pl=${EFFECTIVE_NO_PL} restart=${RESTART}"
-echo "[ultra-yubin] skip_pl_load=${SKIP_PL_LOAD} skip_pl_init=${SKIP_PL_INIT} lazy_pl_open=${LAZY_PL_OPEN}"
+echo "[ultra-yubin] skip_pl_load=${SKIP_PL_LOAD} skip_pl_init=${SKIP_PL_INIT} skip_dxl_init=${SKIP_DXL_INIT} lazy_pl_open=${LAZY_PL_OPEN}"
 if [ "${SERVICE_ACTIVE}" = "active" ] && [ "${RESTART}" != "1" ]; then
   echo "[ultra-yubin] service already active; updating files without restart."
   echo "[ultra-yubin] set ULTRA_YUBIN_RESTART=1 to force service restart."
@@ -81,6 +88,10 @@ fi
 skip_pl_init_arg=""
 if [ "${SKIP_PL_INIT}" = "1" ]; then
   skip_pl_init_arg=" --skip-pl-init"
+fi
+skip_dxl_init_arg=""
+if [ "${SKIP_DXL_INIT}" = "1" ]; then
+  skip_dxl_init_arg=" --skip-dxl-init"
 fi
 lazy_pl_open_arg=""
 if [ "${LAZY_PL_OPEN}" = "1" ]; then
@@ -107,9 +118,11 @@ elif [ '${EFFECTIVE_NO_PL}' != '1' ]; then
 else
   echo 'no-pl mode: skipping FPGA manager reload'
 fi
-printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' setsid '${REMOTE_ROOT}/pl_udp_usb_dxl_bridge' --base '${BASE}' --port '${PORT}' --serial '${SERIAL}' --baud '${BAUD}' --pan-id '${PAN_ID}' --tilt-id '${TILT_ID}'${dry_arg}${no_pl_arg}${skip_pl_init_arg}${lazy_pl_open_arg} >/tmp/ultra_yubin_manual.log 2>&1 < /dev/null &
+manual_log='${REMOTE_ROOT}/ultra_yubin_manual.log'
+rm -f \"\$manual_log\"
+setsid sh -c \"printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' '${REMOTE_ROOT}/pl_udp_usb_dxl_bridge' --base '${BASE}' --port '${PORT}' --serial '${SERIAL}' --baud '${BAUD}' --pan-id '${PAN_ID}' --tilt-id '${TILT_ID}' --profile-accel '${PROFILE_ACCEL}' --profile-velocity '${PROFILE_VELOCITY}' --center-file '${CENTER_FILE}'${dry_arg}${no_pl_arg}${skip_pl_init_arg}${skip_dxl_init_arg}${lazy_pl_open_arg}\" >\"\$manual_log\" 2>&1 < /dev/null &
 sleep 1
-pidof pl_udp_usb_dxl_bridge || { cat /tmp/ultra_yubin_manual.log; exit 1; }"
+pidof pl_udp_usb_dxl_bridge || { cat \"\$manual_log\"; exit 1; }"
 
 if [ "${SKIP_CHECK}" = "1" ]; then
   echo "[ultra-yubin] skipping bring-up check because ULTRA_YUBIN_SKIP_CHECK=1"

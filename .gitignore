@@ -2,5 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 benchmark_logs/*.log
+benchmark_logs/*.jsonl
+pl_goal_compute_axi_tb.pass
 *.tmp
 *.bak

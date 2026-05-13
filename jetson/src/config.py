@@ -44,6 +44,7 @@ AERIAL_TARGET_CLASSES = [0]
 # jh HUD settings.
 UI_RENDER_INTERVAL_FRAMES = int(os.getenv("UI_RENDER_INTERVAL_FRAMES", "2"))
 UI_CAMERA_EVERY_FRAME = os.getenv("UI_CAMERA_EVERY_FRAME", "1") == "1"
+UI_MINIMAL = os.getenv("UI_MINIMAL", "1") == "1"
 UI_FULLSCREEN = os.getenv("UI_FULLSCREEN", "1") == "1"
 UI_SCREEN_WIDTH = int(os.getenv("UI_SCREEN_WIDTH", "0"))
 UI_SCREEN_HEIGHT = int(os.getenv("UI_SCREEN_HEIGHT", "0"))

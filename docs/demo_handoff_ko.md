@@ -36,6 +36,7 @@ ReSpeaker DOA -> Jetson angle -> UDP A command
 
 현재 가장 괜찮았던 구조:
 
+- 기본 UI는 CCTV 화면, 표적지, bbox, 탐지 상태, PL/USB 상태만 보이는 미니멀 모드
 - 카메라 강제 manual glare 설정 OFF
 - YOLO conf는 `0.35`
 - target filter는 `TRACK_TARGET_MIN_CONF=0.55`, `TRACK_TARGET_MIN_AREA=1000`
@@ -84,8 +85,11 @@ python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.
 
 현재 `run_demo.sh` 내용은 보수적 안정 버전이다.
 
+- `UI_MINIMAL=1`
 - `ULTRA_YUBIN_CONTROL_PERIOD_SEC=0.06`
 - `ULTRA_YUBIN_DEADBAND_PX=14`
+
+기존 우측 패널 HUD를 다시 보고 싶으면 실행 앞에 `UI_MINIMAL=0`을 붙인다.
 
 조금 더 빠르게 하려면:
 
@@ -239,4 +243,3 @@ ReSpeaker는 주 추적이 아니라 탐색/재획득 보조 경로로 설명한
   - 수동 pan/tilt nudge
 - `tools/respeaker_to_ultra96_ps.py`
   - ReSpeaker DOA -> Ultra96 PS audio command
-

@@ -195,11 +195,17 @@ class AntiDroneDisplay:
         self._ensure_window()
 
         h, w = frame.shape[:2]
+        sys_state = self.state.system_state
+        if getattr(config, "UI_MINIMAL", True):
+            self._draw_minimal_overlay(frame, bboxes, fps, sys_state, motor_info)
+            full = self._compose_minimal_output(frame)
+            cv2.imshow(self.window_name, full)
+            return full
+
         display_w, display_h = self._target_display_size(w, h)
         self._panel_w = self._panel_width_for(display_w)
         self._camera_display_w = max(1, display_w - self._panel_w)
         self._frame_w = self._camera_display_w   # 버튼 좌표 계산용
-        sys_state = self.state.system_state
         theme = STATE_THEME[sys_state]
 
         self._draw_camera_overlay(
@@ -220,11 +226,17 @@ class AntiDroneDisplay:
         """Show latest camera with full camera overlay, reusing the side panel."""
         self._ensure_window()
         h, w = frame.shape[:2]
+        sys_state = self.state.system_state
+        if getattr(config, "UI_MINIMAL", True):
+            self._draw_minimal_overlay(frame, bboxes, fps, sys_state, motor_info)
+            full = self._compose_minimal_output(frame)
+            cv2.imshow(self.window_name, full)
+            return full
+
         display_w, display_h = self._target_display_size(w, h)
         self._panel_w = self._panel_width_for(display_w)
         self._camera_display_w = max(1, display_w - self._panel_w)
         self._frame_w = self._camera_display_w
-        sys_state = self.state.system_state
         theme = STATE_THEME[sys_state]
 
         self._draw_camera_overlay(
@@ -239,6 +251,91 @@ class AntiDroneDisplay:
         full = self._compose_output(frame, panel)
         cv2.imshow(self.window_name, full)
         return full
+
+    def _compose_minimal_output(self, camera_frame):
+        frame_h, frame_w = camera_frame.shape[:2]
+        if not config.UI_FULLSCREEN:
+            self._display_size = (frame_w, frame_h)
+            self._camera_display_w = frame_w
+            self._frame_w = frame_w
+            return camera_frame
+        if self._screen_size is None:
+            self._screen_size = self._detect_screen_size()
+        if self._screen_size is None:
+            self._display_size = (frame_w, frame_h)
+            self._camera_display_w = frame_w
+            self._frame_w = frame_w
+            return camera_frame
+        display_w, display_h = self._screen_size
+        self._display_size = (display_w, display_h)
+        self._camera_display_w = display_w
+        self._frame_w = display_w
+        return self._resize_cover(camera_frame, display_w, display_h)
+
+    def _draw_minimal_overlay(self, frame, bboxes, fps, sys_state, motor_info=None):
+        h, w = frame.shape[:2]
+        target = next((b for b in bboxes if b.get("is_target", False)), None)
+        theme = STATE_THEME[sys_state]
+        status = "DRONE DETECTED" if target else "SEARCHING"
+        color = HUD_GREEN if target else HUD_DIM
+        if sys_state in (SystemState.TRACKING, SystemState.LOCKED, SystemState.ENGAGED):
+            status = "DRONE TRACKING" if sys_state != SystemState.LOCKED else "DRONE LOCKED"
+            color = HUD_RED if sys_state == SystemState.LOCKED else HUD_CYAN
+
+        self._draw_border(frame, {"color": color, "blink": False})
+        self._draw_crosshair(frame, w, h, sys_state, motor_info)
+        self._draw_minimal_bboxes(frame, bboxes)
+        self._draw_minimal_status(frame, status, color, fps, motor_info, target)
+
+    def _draw_minimal_bboxes(self, frame, bboxes):
+        for b in bboxes:
+            if not b.get("is_target", False):
+                continue
+            x1, y1, x2, y2 = [int(v) for v in b["box"]]
+            conf = float(b.get("conf", 0.0))
+            c = HUD_GREEN if conf >= 0.80 else HUD_AMBER if conf >= 0.65 else HUD_RED
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 0), 4, cv2.LINE_AA)
+            cv2.rectangle(frame, (x1, y1), (x2, y2), c, 2, cv2.LINE_AA)
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            cv2.line(frame, (cx - 10, cy), (cx + 10, cy), c, 1, cv2.LINE_AA)
+            cv2.line(frame, (cx, cy - 10), (cx, cy + 10), c, 1, cv2.LINE_AA)
+            label = f"DRONE {conf:.0%}"
+            (tw, th), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.55, 1)
+            ly = max(24, y1 - 8)
+            cv2.rectangle(frame, (x1, ly - th - 8), (x1 + tw + 12, ly + 4), (0, 0, 0), -1)
+            cv2.putText(frame, label, (x1 + 6, ly),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, c, 1, cv2.LINE_AA)
+
+    def _draw_minimal_status(self, frame, status, color, fps, motor_info=None, target=None):
+        h, w = frame.shape[:2]
+        cv2.rectangle(frame, (0, 0), (w, 34), (0, 0, 0), -1)
+        cv2.putText(frame, "CCTV", (10, 23), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.62, HUD_WHITE, 1, cv2.LINE_AA)
+        cv2.circle(frame, (88, 18), 6, color, -1, cv2.LINE_AA)
+        cv2.putText(frame, status, (104, 23), cv2.FONT_HERSHEY_SIMPLEX,
+                    0.58, color, 1, cv2.LINE_AA)
+
+        right = f"FPS {int(fps)}"
+        if motor_info:
+            src = str(motor_info.get("src", "") or "")
+            usb = int(motor_info.get("usb_ok") or 0)
+            reply = str(motor_info.get("fpga_reply", "") or "")
+            if reply.startswith("SKIP"):
+                right += f"  {reply[:18]}"
+            elif src:
+                right += f"  {src.upper()}"
+            right += f"  USB {usb}"
+        (tw, _), _ = cv2.getTextSize(right, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)
+        cv2.putText(frame, right, (max(8, w - tw - 12), 22),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.45, HUD_WHITE, 1, cv2.LINE_AA)
+
+        if target:
+            x1, y1, x2, y2 = [int(v) for v in target["box"]]
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+            bottom = f"bbox center=({cx},{cy}) size={x2-x1}x{y2-y1}"
+            cv2.rectangle(frame, (0, h - 28), (w, h), (0, 0, 0), -1)
+            cv2.putText(frame, bottom, (10, h - 9),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.48, HUD_WHITE, 1, cv2.LINE_AA)
 
     def _draw_camera_overlay(self, frame, bboxes, fps, threat_info, sys_state,
                              theme, fire_status=None, motor_info=None):

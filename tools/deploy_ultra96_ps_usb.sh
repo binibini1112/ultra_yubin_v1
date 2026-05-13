@@ -17,6 +17,7 @@ RESTART="${ULTRA_YUBIN_RESTART:-0}"
 SKIP_CHECK="${ULTRA_YUBIN_SKIP_CHECK:-1}"
 SKIP_PL_LOAD="${ULTRA_YUBIN_SKIP_PL_LOAD:-1}"
 SKIP_PL_INIT="${ULTRA_YUBIN_SKIP_PL_INIT:-1}"
+LAZY_PL_OPEN="${ULTRA_YUBIN_LAZY_PL_OPEN:-1}"
 SUDO_PASS="${ULTRA96_SUDO_PASSWORD:-xilinx}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
@@ -55,7 +56,7 @@ if [ "${NO_PL}" = "auto" ]; then
 fi
 
 echo "[ultra-yubin] service=${SERVICE_ACTIVE:-inactive} serial_present=${SERIAL_PRESENT} dry=${EFFECTIVE_DRY_RUN} no_pl=${EFFECTIVE_NO_PL} restart=${RESTART}"
-echo "[ultra-yubin] skip_pl_load=${SKIP_PL_LOAD} skip_pl_init=${SKIP_PL_INIT}"
+echo "[ultra-yubin] skip_pl_load=${SKIP_PL_LOAD} skip_pl_init=${SKIP_PL_INIT} lazy_pl_open=${LAZY_PL_OPEN}"
 if [ "${SERVICE_ACTIVE}" = "active" ] && [ "${RESTART}" != "1" ]; then
   echo "[ultra-yubin] service already active; updating files without restart."
   echo "[ultra-yubin] set ULTRA_YUBIN_RESTART=1 to force service restart."
@@ -81,12 +82,20 @@ skip_pl_init_arg=""
 if [ "${SKIP_PL_INIT}" = "1" ]; then
   skip_pl_init_arg=" --skip-pl-init"
 fi
+lazy_pl_open_arg=""
+if [ "${LAZY_PL_OPEN}" = "1" ]; then
+  lazy_pl_open_arg=" --lazy-pl-open"
+fi
 
 ssh "${USER}@${HOST}" "printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' systemctl disable --now '${SERVICE}' >/dev/null 2>&1 || true
 printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' rm -f '/etc/systemd/system/${SERVICE}'
 printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' systemctl daemon-reload
-for pid in \$(pgrep -f '^${REMOTE_ROOT}/pl_udp_usb_dxl_bridge' || true); do
-  printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' kill \"\$pid\" 2>/dev/null || true
+for pid in \$(pidof pl_udp_usb_dxl_bridge 2>/dev/null || true); do
+  ppid=\$(awk '/^PPid:/ {print \$2}' /proc/\"\$pid\"/status 2>/dev/null || true)
+  printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' kill -9 \"\$pid\" 2>/dev/null || true
+  if [ -n \"\$ppid\" ] && [ \"\$ppid\" != '1' ]; then
+    printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' kill -9 \"\$ppid\" 2>/dev/null || true
+  fi
 done
 if [ '${SKIP_PL_LOAD}' = '1' ]; then
   echo 'skip-pl-load mode: keeping current FPGA image'
@@ -98,9 +107,9 @@ elif [ '${EFFECTIVE_NO_PL}' != '1' ]; then
 else
   echo 'no-pl mode: skipping FPGA manager reload'
 fi
-printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' setsid '${REMOTE_ROOT}/pl_udp_usb_dxl_bridge' --base '${BASE}' --port '${PORT}' --serial '${SERIAL}' --baud '${BAUD}' --pan-id '${PAN_ID}' --tilt-id '${TILT_ID}'${dry_arg}${no_pl_arg}${skip_pl_init_arg} >/tmp/ultra_yubin_manual.log 2>&1 < /dev/null &
+printf '%s\n' '${SUDO_PASS}' | sudo -S -p '' setsid '${REMOTE_ROOT}/pl_udp_usb_dxl_bridge' --base '${BASE}' --port '${PORT}' --serial '${SERIAL}' --baud '${BAUD}' --pan-id '${PAN_ID}' --tilt-id '${TILT_ID}'${dry_arg}${no_pl_arg}${skip_pl_init_arg}${lazy_pl_open_arg} >/tmp/ultra_yubin_manual.log 2>&1 < /dev/null &
 sleep 1
-pgrep -af '^${REMOTE_ROOT}/pl_udp_usb_dxl_bridge' || { cat /tmp/ultra_yubin_manual.log; exit 1; }"
+pidof pl_udp_usb_dxl_bridge || { cat /tmp/ultra_yubin_manual.log; exit 1; }"
 
 if [ "${SKIP_CHECK}" = "1" ]; then
   echo "[ultra-yubin] skipping bring-up check because ULTRA_YUBIN_SKIP_CHECK=1"

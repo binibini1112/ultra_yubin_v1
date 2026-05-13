@@ -24,6 +24,15 @@ Ultra96가 USB Ethernet `192.168.3.1`로 잡힌 뒤:
 cd /home/jetson/ultra_yubin
 ./tools/load_bitstream_only.sh
 ./tools/deploy_ultra96_ps_usb.sh
+```
+
+기본 배포는 SSH/USB 안정성 확인용입니다. PL AXI 경로를 실제로 켜려면 bitstream을 새로 로드한 뒤 아래처럼 lazy-open 상태로 브릿지를 띄우고, `PLPING`부터 한 단계씩 확인합니다.
+
+```bash
+ULTRA_YUBIN_NO_PL=0 ULTRA_YUBIN_SKIP_PL_LOAD=1 ULTRA_YUBIN_SKIP_CHECK=1 \
+ULTRA_YUBIN_SKIP_PL_INIT=1 ULTRA_YUBIN_LAZY_PL_OPEN=1 ULTRA_YUBIN_RESTART=1 \
+./tools/deploy_ultra96_ps_usb.sh
+
 python3 tools/pl_bringup_check.py --host 192.168.3.1 --port 5016 --no-save
 ```
 
@@ -47,7 +56,9 @@ python3 jetson/jetson_node.py --camera 0 --audio-fallback
 실제 PL/U2D2까지 강제로 사용하려면:
 
 ```bash
-ULTRA_YUBIN_DRY_RUN=0 ULTRA_YUBIN_NO_PL=0 ULTRA_YUBIN_SKIP_PL_LOAD=1 ULTRA_YUBIN_RESTART=1 ./tools/deploy_ultra96_ps_usb.sh
+ULTRA_YUBIN_DRY_RUN=0 ULTRA_YUBIN_NO_PL=0 ULTRA_YUBIN_SKIP_PL_LOAD=1 \
+ULTRA_YUBIN_SKIP_PL_INIT=1 ULTRA_YUBIN_LAZY_PL_OPEN=1 ULTRA_YUBIN_RESTART=1 \
+./tools/deploy_ultra96_ps_usb.sh
 ```
 
 PL 주소 또는 AXI 응답이 틀린 상태에서 `ULTRA_YUBIN_NO_PL=0`으로 `T/PLPING` 명령을 보내면 Ultra96 PS 버스가 멈출 수 있으므로, 먼저 no-pl 상태에서 UDP/U2D2 경로를 확인해야 합니다. `A` 오디오 fallback은 PS에서 처리합니다.

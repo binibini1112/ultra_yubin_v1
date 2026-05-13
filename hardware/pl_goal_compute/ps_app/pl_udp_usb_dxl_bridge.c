@@ -45,7 +45,7 @@ static void usage(const char *argv0)
     fprintf(stderr,
         "Usage: %s --base 0xA0000000 [--port 5016] [--serial /dev/ttyUSB0] "
         "[--baud 57600] [--pan-id 1] [--tilt-id 2] [--dry-run] [--no-pl] "
-        "[--skip-pl-init]\n",
+        "[--skip-pl-init] [--lazy-pl-open]\n",
         argv0);
 }
 
@@ -88,6 +88,45 @@ static void pl_init_defaults(volatile uint32_t *regs, uint32_t pan_id, uint32_t 
     reg_write(regs, REG_TRACK_FRAME, pack_u16(1280u, 720u));
     reg_write(regs, REG_IDS, ((tilt_id & 0xffu) << 8) | (pan_id & 0xffu));
     reg_write(regs, REG_CTRL, 1u);
+}
+
+static int open_pl_regs(uint32_t base, int *mem_fd, void **map, volatile uint32_t **regs)
+{
+    if (*regs != NULL) {
+        return 0;
+    }
+
+    *mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
+    if (*mem_fd < 0) {
+        perror("open /dev/mem");
+        return -1;
+    }
+
+    off_t page_base = (off_t)(base & ~(MAP_SIZE - 1u));
+    off_t page_off = (off_t)(base - (uint32_t)page_base);
+    *map = mmap(NULL, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, *mem_fd, page_base);
+    if (*map == MAP_FAILED) {
+        perror("mmap");
+        close(*mem_fd);
+        *mem_fd = -1;
+        return -1;
+    }
+
+    *regs = (volatile uint32_t *)((uint8_t *)*map + page_off);
+    return 0;
+}
+
+static void close_pl_regs(int *mem_fd, void **map, volatile uint32_t **regs)
+{
+    *regs = NULL;
+    if (*map != MAP_FAILED) {
+        munmap(*map, MAP_SIZE);
+        *map = MAP_FAILED;
+    }
+    if (*mem_fd >= 0) {
+        close(*mem_fd);
+        *mem_fd = -1;
+    }
 }
 
 static speed_t baud_to_speed(int baud)
@@ -228,6 +267,7 @@ int main(int argc, char **argv)
     int dry_run = 0;
     int no_pl = 0;
     int skip_pl_init = 0;
+    int lazy_pl_open = 0;
     uint32_t sw_ctrl = 1u;
     uint32_t sw_count = 0u;
     uint32_t sw_pan = PAN_CENTER;
@@ -252,6 +292,8 @@ int main(int argc, char **argv)
             no_pl = 1;
         } else if (!strcmp(argv[i], "--skip-pl-init")) {
             skip_pl_init = 1;
+        } else if (!strcmp(argv[i], "--lazy-pl-open")) {
+            lazy_pl_open = 1;
         } else {
             usage(argv[0]);
             return 2;
@@ -269,22 +311,10 @@ int main(int argc, char **argv)
     int mem_fd = -1;
     void *map = MAP_FAILED;
     volatile uint32_t *regs = NULL;
-    if (!no_pl) {
-        mem_fd = open("/dev/mem", O_RDWR | O_SYNC);
-        if (mem_fd < 0) {
-            perror("open /dev/mem");
+    if (!no_pl && !lazy_pl_open) {
+        if (open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
             return 1;
         }
-
-        off_t page_base = (off_t)(base & ~(MAP_SIZE - 1u));
-        off_t page_off = (off_t)(base - (uint32_t)page_base);
-        map = mmap(NULL, MAP_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, mem_fd, page_base);
-        if (map == MAP_FAILED) {
-            perror("mmap");
-            close(mem_fd);
-            return 1;
-        }
-        regs = (volatile uint32_t *)((uint8_t *)map + page_off);
     }
 
     int serial_fd = -1;
@@ -292,8 +322,7 @@ int main(int argc, char **argv)
         serial_fd = open_serial(serial_path, baud);
         if (serial_fd < 0) {
             perror("open serial");
-            if (map != MAP_FAILED) munmap(map, MAP_SIZE);
-            if (mem_fd >= 0) close(mem_fd);
+            close_pl_regs(&mem_fd, &map, &regs);
             return 1;
         }
     }
@@ -302,8 +331,7 @@ int main(int argc, char **argv)
     if (sock < 0) {
         perror("socket");
         if (serial_fd >= 0) close(serial_fd);
-        if (map != MAP_FAILED) munmap(map, MAP_SIZE);
-        if (mem_fd >= 0) close(mem_fd);
+        close_pl_regs(&mem_fd, &map, &regs);
         return 1;
     }
 
@@ -320,18 +348,23 @@ int main(int argc, char **argv)
         perror("bind");
         close(sock);
         if (serial_fd >= 0) close(serial_fd);
-        if (map != MAP_FAILED) munmap(map, MAP_SIZE);
-        if (mem_fd >= 0) close(mem_fd);
+        close_pl_regs(&mem_fd, &map, &regs);
         return 1;
     }
 
     if (!no_pl && !skip_pl_init) {
+        if (open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
+            close(sock);
+            if (serial_fd >= 0) close(serial_fd);
+            close_pl_regs(&mem_fd, &map, &regs);
+            return 1;
+        }
         pl_init_defaults(regs, pan_id, tilt_id);
     }
 
     printf("[ultra_yubin] UDP listen 0.0.0.0:%d, AXI base 0x%08x\n", udp_port, base);
-    printf("[ultra_yubin] serial=%s baud=%d dry_run=%d no_pl=%d skip_pl_init=%d pan_id=%u tilt_id=%u\n",
-           serial_path, baud, dry_run, no_pl, skip_pl_init, pan_id, tilt_id);
+    printf("[ultra_yubin] serial=%s baud=%d dry_run=%d no_pl=%d skip_pl_init=%d lazy_pl_open=%d pan_id=%u tilt_id=%u\n",
+           serial_path, baud, dry_run, no_pl, skip_pl_init, lazy_pl_open, pan_id, tilt_id);
     fflush(stdout);
 
     while (g_running) {
@@ -353,13 +386,18 @@ int main(int argc, char **argv)
 
         if (!strcmp(buf, "PING")) {
             char reply[160];
-            snprintf(reply, sizeof(reply), "PONG,UDP,ULTRA_YUBIN,base=0x%08x,port=%d,dry=%d,no_pl=%d\n",
-                     base, udp_port, dry_run, no_pl);
+            snprintf(reply, sizeof(reply), "PONG,UDP,ULTRA_YUBIN,base=0x%08x,port=%d,dry=%d,no_pl=%d,lazy=%d,pl_open=%d\n",
+                     base, udp_port, dry_run, no_pl, lazy_pl_open, regs != NULL);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
         }
 
         if (!strcmp(buf, "PLPING")) {
+            if (!no_pl && open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
+                const char *reply = "ERR,pl-open-failed\n";
+                sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
+                continue;
+            }
             uint32_t ctrl = no_pl ? sw_ctrl : reg_read(regs, REG_CTRL);
             uint32_t count = no_pl ? sw_count : reg_read(regs, REG_STATUS);
             uint32_t pan = no_pl ? sw_pan : reg_read(regs, REG_PAN_GOAL);
@@ -379,6 +417,11 @@ int main(int argc, char **argv)
                 sw_tilt = tilt;
                 sw_count++;
             } else {
+                if (open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
+                    const char *reply = "ERR,pl-open-failed\n";
+                    sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
+                    continue;
+                }
                 reg_write(regs, REG_PAN_GOAL, pan);
                 reg_write(regs, REG_TILT_GOAL, tilt);
                 reg_write(regs, REG_CTRL, 1u);
@@ -401,6 +444,11 @@ int main(int argc, char **argv)
                 sw_count++;
                 count = sw_count;
             } else {
+                if (open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
+                    const char *reply = "ERR,pl-open-failed\n";
+                    sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
+                    continue;
+                }
                 reg_write(regs, REG_TRACK_XY, pack_u16(cx, cy));
                 reg_write(regs, REG_TRACK_FRAME, pack_u16(fw, fh));
                 reg_write(regs, REG_TRACK_CMD,
@@ -421,6 +469,11 @@ int main(int argc, char **argv)
 
         int angle = 0;
         if (sscanf(buf, "A %d %u %u", &angle, &conf, &valid) == 3) {
+            if (!no_pl && open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
+                const char *reply = "ERR,pl-open-failed\n";
+                sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
+                continue;
+            }
             uint32_t pan_now = sw_pan;
             uint32_t tilt_now = no_pl ? sw_tilt : reg_read(regs, REG_TILT_GOAL);
             uint32_t count;
@@ -450,7 +503,6 @@ int main(int argc, char **argv)
 
     close(sock);
     if (serial_fd >= 0) close(serial_fd);
-    if (map != MAP_FAILED) munmap(map, MAP_SIZE);
-    if (mem_fd >= 0) close(mem_fd);
+    close_pl_regs(&mem_fd, &map, &regs);
     return 0;
 }

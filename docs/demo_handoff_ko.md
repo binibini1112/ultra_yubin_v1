@@ -89,6 +89,14 @@ python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.
 - `ULTRA_YUBIN_CONTROL_PERIOD_SEC=0.06`
 - `ULTRA_YUBIN_DEADBAND_PX=14`
 
+Tello가 너무 작게 잡히거나 탐지가 자주 끊기면 중앙 크롭 시현 모드를 먼저 시험한다.
+
+```bash
+./run_demo_crop.sh
+```
+
+이 모드는 카메라 중앙 70% 영역을 잘라 다시 1280x720으로 키운다. YOLO 엔진 입력 크기 `640`은 그대로 두고, PL/모터 좌표계도 기존 1280x720 기준을 유지한다. 드론이 화면 가장자리에서 자주 사라지면 `CAMERA_CROP_SCALE=0.80 ./run_demo_crop.sh`처럼 크롭을 약하게 한다.
+
 기존 우측 패널 HUD를 다시 보고 싶으면 실행 앞에 `UI_MINIMAL=0`을 붙인다.
 
 조금 더 빠르게 하려면:

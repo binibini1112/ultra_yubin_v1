@@ -278,6 +278,16 @@ class CameraStream:
             frame = cv2.flip(frame, 0)
         if getattr(config, "CAMERA_FLIP_HORIZONTAL", False):
             frame = cv2.flip(frame, 1)
+        if getattr(config, "CAMERA_CENTER_CROP", False):
+            scale = max(0.35, min(1.0, float(config.CAMERA_CROP_SCALE)))
+            if scale < 0.999:
+                h, w = frame.shape[:2]
+                crop_w = max(1, int(w * scale))
+                crop_h = max(1, int(h * scale))
+                x0 = (w - crop_w) // 2
+                y0 = (h - crop_h) // 2
+                frame = frame[y0:y0 + crop_h, x0:x0 + crop_w]
+                frame = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
         return frame
 
     def stop(self):

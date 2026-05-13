@@ -47,10 +47,7 @@ module pl_goal_compute_axi #(
     localparam [31:0] GOAL_MAX = 32'd4095;
 
     reg [C_S_AXI_ADDR_WIDTH-1:0] awaddr_q;
-    reg [C_S_AXI_DATA_WIDTH-1:0] wdata_q;
-    reg [(C_S_AXI_DATA_WIDTH/8)-1:0] wstrb_q;
-    reg aw_valid_q;
-    reg w_valid_q;
+    reg aw_en;
 
     reg [31:0] pan_goal;
     reg [31:0] tilt_goal;
@@ -71,9 +68,7 @@ module pl_goal_compute_axi #(
     reg signed [15:0] track_pan_gain;
     reg signed [15:0] track_tilt_gain;
 
-    wire aw_take = s_axi_awready && s_axi_awvalid;
-    wire w_take = s_axi_wready && s_axi_wvalid;
-    wire write_fire = aw_valid_q && w_valid_q && !s_axi_bvalid;
+    wire write_fire = s_axi_awready && s_axi_awvalid && s_axi_wready && s_axi_wvalid;
 
     wire signed [31:0] track_error_x;
     wire signed [31:0] track_error_y;
@@ -132,6 +127,26 @@ module pl_goal_compute_axi #(
         end
     endfunction
 
+    initial begin
+        pan_goal = 32'd2048;
+        tilt_goal = 32'd2772;
+        pan_id = 8'd1;
+        tilt_id = 8'd2;
+        done_toggle = 1'b0;
+        track_toggle = 1'b0;
+        audio_toggle = 1'b0;
+        compute_count = 32'h0;
+        last_pan = 32'd2048;
+        last_tilt = 32'd2772;
+        track_cx = 16'd640;
+        track_cy = 16'd360;
+        track_fw = 16'd1280;
+        track_fh = 16'd720;
+        track_conf = 16'h0;
+        track_pan_gain = 16'sd1;
+        track_tilt_gain = -16'sd1;
+    end
+
     always @(posedge s_axi_aclk) begin
         if (!s_axi_aresetn) begin
             s_axi_awready <= 1'b0;
@@ -139,29 +154,28 @@ module pl_goal_compute_axi #(
             s_axi_bresp <= 2'b00;
             s_axi_bvalid <= 1'b0;
             awaddr_q <= {C_S_AXI_ADDR_WIDTH{1'b0}};
-            wdata_q <= {C_S_AXI_DATA_WIDTH{1'b0}};
-            wstrb_q <= {(C_S_AXI_DATA_WIDTH/8){1'b0}};
-            aw_valid_q <= 1'b0;
-            w_valid_q <= 1'b0;
+            aw_en <= 1'b1;
         end else begin
-            s_axi_awready <= !aw_valid_q && !s_axi_bvalid;
-            s_axi_wready <= !w_valid_q && !s_axi_bvalid;
-
-            if (aw_take) begin
+            if (!s_axi_awready && s_axi_awvalid && s_axi_wvalid && aw_en) begin
+                s_axi_awready <= 1'b1;
                 awaddr_q <= s_axi_awaddr;
-                aw_valid_q <= 1'b1;
-            end
-            if (w_take) begin
-                wdata_q <= s_axi_wdata;
-                wstrb_q <= s_axi_wstrb;
-                w_valid_q <= 1'b1;
+                aw_en <= 1'b0;
+            end else if (s_axi_bvalid && s_axi_bready) begin
+                aw_en <= 1'b1;
+                s_axi_awready <= 1'b0;
+            end else begin
+                s_axi_awready <= 1'b0;
             end
 
-            if (write_fire) begin
+            if (!s_axi_wready && s_axi_wvalid && s_axi_awvalid && aw_en) begin
+                s_axi_wready <= 1'b1;
+            end else begin
+                s_axi_wready <= 1'b0;
+            end
+
+            if (write_fire && !s_axi_bvalid) begin
                 s_axi_bvalid <= 1'b1;
                 s_axi_bresp <= 2'b00;
-                aw_valid_q <= 1'b0;
-                w_valid_q <= 1'b0;
             end else if (s_axi_bvalid && s_axi_bready) begin
                 s_axi_bvalid <= 1'b0;
             end
@@ -212,7 +226,7 @@ module pl_goal_compute_axi #(
         end else if (write_fire) begin
             case (awaddr_q[5:0] & 6'h3c)
                 ADDR_CTRL: begin
-                    if (wdata_q[0]) begin
+                    if (s_axi_wdata[0]) begin
                         last_pan <= pan_goal;
                         last_tilt <= tilt_goal;
                         compute_count <= compute_count + 1'b1;
@@ -220,30 +234,26 @@ module pl_goal_compute_axi #(
                     end
                 end
                 ADDR_PAN_GOAL: begin
-                    pan_goal <= apply_wstrb(pan_goal, wdata_q, wstrb_q);
+                    pan_goal <= s_axi_wdata;
                 end
                 ADDR_TILT_GOAL: begin
-                    tilt_goal <= apply_wstrb(tilt_goal, wdata_q, wstrb_q);
+                    tilt_goal <= s_axi_wdata;
                 end
                 ADDR_IDS: begin
-                    if (wstrb_q[0]) pan_id <= wdata_q[7:0];
-                    if (wstrb_q[1]) tilt_id <= wdata_q[15:8];
+                    pan_id <= s_axi_wdata[7:0];
+                    tilt_id <= s_axi_wdata[15:8];
                 end
                 ADDR_TRACK_XY: begin
-                    if (wstrb_q[0]) track_cx[7:0] <= wdata_q[7:0];
-                    if (wstrb_q[1]) track_cx[15:8] <= wdata_q[15:8];
-                    if (wstrb_q[2]) track_cy[7:0] <= wdata_q[23:16];
-                    if (wstrb_q[3]) track_cy[15:8] <= wdata_q[31:24];
+                    track_cx <= s_axi_wdata[15:0];
+                    track_cy <= s_axi_wdata[31:16];
                 end
                 ADDR_TRACK_FRAME: begin
-                    if (wstrb_q[0]) track_fw[7:0] <= wdata_q[7:0];
-                    if (wstrb_q[1]) track_fw[15:8] <= wdata_q[15:8];
-                    if (wstrb_q[2]) track_fh[7:0] <= wdata_q[23:16];
-                    if (wstrb_q[3]) track_fh[15:8] <= wdata_q[31:24];
+                    track_fw <= s_axi_wdata[15:0];
+                    track_fh <= s_axi_wdata[31:16];
                 end
                 ADDR_TRACK_CMD: begin
-                    track_conf <= wdata_q[23:8];
-                    if (wdata_q[0] && wdata_q[1] && track_fw != 16'h0 && track_fh != 16'h0) begin
+                    track_conf <= s_axi_wdata[23:8];
+                    if (s_axi_wdata[0] && s_axi_wdata[1] && track_fw != 16'h0 && track_fh != 16'h0) begin
                         pan_goal <= clamp_goal($signed({32'h0, pan_goal}) + $signed(track_pan_delta));
                         tilt_goal <= clamp_goal($signed({32'h0, tilt_goal}) + $signed(track_tilt_delta));
                         last_pan <= clamp_goal($signed({32'h0, pan_goal}) + $signed(track_pan_delta));

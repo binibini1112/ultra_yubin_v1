@@ -2,6 +2,8 @@
 
 Jetson YOLO/Audio -> Ultra96 PS -> Ultra96 PL bbox goal compute -> Ultra96 PS USB/U2D2 -> Dynamixel 구조만 남긴 최소 프로젝트입니다.
 
+교수님께 공유할 현재 진행 상황 요약은 [docs/professor_summary.md](docs/professor_summary.md)에 정리되어 있습니다.
+
 ## 핵심 구조
 
 - Jetson: 카메라 YOLO bbox 산출, YOLO 미검출 시 ReSpeaker/Tello audio fallback 각도 산출, UDP 5016 송신

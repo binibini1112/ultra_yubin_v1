@@ -352,6 +352,7 @@ def main():
                         and (
                             last_audio_angle is None
                             or audio_delta(audio_angle, last_audio_angle) >= float(config.TELLO_AUDIO_MIN_CHANGE_DEG)
+                            or now - last_audio_sent >= float(config.TELLO_AUDIO_KEEPALIVE_SEC)
                         )
                     )
                     if should_send_audio:

@@ -29,7 +29,11 @@ class UltraYubinMotorController:
         self.default_bbox_h = int(os.getenv("ULTRA_YUBIN_DEFAULT_BBOX_H", "0"))
         self.control_period_sec = float(os.getenv("ULTRA_YUBIN_CONTROL_PERIOD_SEC", "0.02"))
         self.deadband_px = int(os.getenv("ULTRA_YUBIN_DEADBAND_PX", "5"))
+        self.deadband_x_px = int(os.getenv("ULTRA_YUBIN_DEADBAND_X_PX", str(self.deadband_px)))
+        self.deadband_y_px = int(os.getenv("ULTRA_YUBIN_DEADBAND_Y_PX", str(self.deadband_px)))
         self.smooth_alpha = float(os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA", "1.0"))
+        self.smooth_alpha_x = float(os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA_X", str(self.smooth_alpha)))
+        self.smooth_alpha_y = float(os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA_Y", str(self.smooth_alpha)))
         self.aim_offset_x = int(os.getenv("ULTRA_YUBIN_AIM_OFFSET_X", "0"))
         self.aim_offset_y = int(os.getenv("ULTRA_YUBIN_AIM_OFFSET_Y", "0"))
         self.invert_x_to_pl = os.getenv("ULTRA_YUBIN_INVERT_X_TO_PL", "0") == "1"
@@ -197,7 +201,9 @@ class UltraYubinMotorController:
         aim_cy = (img_height // 2 if aim_center_y is None else int(aim_center_y)) + self.aim_offset_y
         err_x = cx - aim_cx
         err_y = cy - aim_cy
-        if abs(err_x) < self.deadband_px and abs(err_y) < self.deadband_px:
+        quiet_x = abs(err_x) < self.deadband_x_px
+        quiet_y = abs(err_y) < self.deadband_y_px
+        if quiet_x and quiet_y:
             self.last_telemetry.update({
                 "ready": True,
                 "tx_cmd": "",
@@ -236,13 +242,16 @@ class UltraYubinMotorController:
             })
             return dict(self.last_telemetry)
 
+        input_cx = aim_cx if quiet_x else cx
+        input_cy = aim_cy if quiet_y else cy
         if self._smooth_cx is None:
-            self._smooth_cx = float(cx)
-            self._smooth_cy = float(cy)
+            self._smooth_cx = float(input_cx)
+            self._smooth_cy = float(input_cy)
         else:
-            alpha = max(0.0, min(1.0, self.smooth_alpha))
-            self._smooth_cx = alpha * float(cx) + (1.0 - alpha) * self._smooth_cx
-            self._smooth_cy = alpha * float(cy) + (1.0 - alpha) * self._smooth_cy
+            alpha_x = max(0.0, min(1.0, self.smooth_alpha_x))
+            alpha_y = max(0.0, min(1.0, self.smooth_alpha_y))
+            self._smooth_cx = alpha_x * float(input_cx) + (1.0 - alpha_x) * self._smooth_cx
+            self._smooth_cy = alpha_y * float(input_cy) + (1.0 - alpha_y) * self._smooth_cy
         send_cx = int(round(self._smooth_cx))
         send_cy = int(round(self._smooth_cy))
         control_cx = send_cx - self.aim_offset_x

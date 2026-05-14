@@ -43,12 +43,13 @@ ReSpeaker DOA -> Jetson angle -> UDP A command
 - low confidence bbox는 모터 명령에서 제외
 - 화면 가장자리 bbox는 모터 명령에서 제외
 - hold된 이전 bbox는 모터 명령에서 제외
-- PL step table은 다시 공격형으로 조정
+- PL step table은 팬은 빠르게 유지하고, 틸트는 bbox 높이 안에서 크게 둔감하게 하도록 조정
 - GUI 표적지는 실제 `aim_cx/aim_cy`를 따라가도록 수정
 
 주의:
 
-- 최신 RTL 소스는 공격형 step table로 다시 바뀌었다.
+- 최신 RTL 소스는 PL 내부에서 축별 step table, bbox 기반 lock radius, acceleration limit을 다르게 적용한다.
+- 팬은 Tello 이동을 따라갈 만큼 빠르게 유지하고, 틸트는 작은 상하 흔들림에 반응하지 않도록 더 넓은 lock radius와 낮은 step을 쓴다.
 - RTL을 바꾼 뒤에는 반드시 Windows Vivado에서 bitstream을 다시 빌드해야 한다.
 - 로컬 `bitstream/ultra_yubin.bit` 파일이 항상 최신 RTL과 일치한다고 가정하지 말 것.
 
@@ -73,7 +74,7 @@ PL 확인:
 python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.settimeout(2); s.sendto(b'PLTEST\n',('192.168.3.1',5016)); print(s.recvfrom(2048)[0].decode().strip()); s.sendto(b'PLPING\n',('192.168.3.1',5016)); print(s.recvfrom(2048)[0].decode().strip())"
 ```
 
-공격형 RTL이면 `PLTEST`에서 대략 `before_pan=2074`, `after_pan=2090`, `src=pl` 계열이 나온다.
+현재 PL 감쇠 RTL이면 `PLTEST`에서 대략 `before_pan=2074`, `after_pan=2086`, `src=pl` 계열이 나온다.
 
 ## 5. 시현 실행
 

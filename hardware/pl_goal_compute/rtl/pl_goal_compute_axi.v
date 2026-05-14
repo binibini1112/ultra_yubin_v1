@@ -46,13 +46,14 @@ module pl_goal_compute_axi #(
 
     localparam [31:0] GOAL_MIN = 32'd0;
     localparam [31:0] GOAL_MAX = 32'd4095;
-    localparam signed [31:0] TRACK_CENTER_DEADBAND = 32'sd5;
-    localparam signed [31:0] TRACK_MIN_LOCK = 32'sd10;
-    localparam signed [31:0] TRACK_MAX_LOCK = 32'sd48;
-    localparam signed [31:0] TRACK_PAN_MAX_STEP = 32'sd96;
-    localparam signed [31:0] TRACK_TILT_MAX_STEP = 32'sd80;
-    localparam signed [31:0] TRACK_PAN_ACCEL_STEP = 32'sd96;
-    localparam signed [31:0] TRACK_TILT_ACCEL_STEP = 32'sd80;
+    localparam signed [31:0] TRACK_PAN_MIN_LOCK = 32'sd14;
+    localparam signed [31:0] TRACK_PAN_MAX_LOCK = 32'sd56;
+    localparam signed [31:0] TRACK_TILT_MIN_LOCK = 32'sd45;
+    localparam signed [31:0] TRACK_TILT_MAX_LOCK = 32'sd100;
+    localparam signed [31:0] TRACK_PAN_MAX_STEP = 32'sd72;
+    localparam signed [31:0] TRACK_TILT_MAX_STEP = 32'sd40;
+    localparam signed [31:0] TRACK_PAN_ACCEL_STEP = 32'sd48;
+    localparam signed [31:0] TRACK_TILT_ACCEL_STEP = 32'sd20;
     localparam [3:0] CMD_LEGACY  = 4'h0;
     localparam [3:0] CMD_SET_PAN = 4'h1;
     localparam [3:0] CMD_SET_TILT = 4'h2;
@@ -107,8 +108,16 @@ module pl_goal_compute_axi #(
 
     assign track_error_x = $signed({16'h0, track_cx}) - $signed({16'h0, (track_fw >> 1)});
     assign track_error_y = $signed({16'h0, track_cy}) - $signed({16'h0, (track_fh >> 1)});
-    assign track_pan_raw_step = shape_step(track_error_x, box_lock(track_bw));
-    assign track_tilt_raw_step = -shape_step(track_error_y, box_lock(track_bh));
+    assign track_pan_raw_step = shape_step_axis(
+        track_error_x,
+        box_lock(track_bw, 1'b0),
+        32'sd12, 32'sd18, 32'sd28, 32'sd40, 32'sd56, 32'sd72, 32'sd72
+    );
+    assign track_tilt_raw_step = -shape_step_axis(
+        track_error_y,
+        box_lock(track_bh, 1'b1),
+        32'sd6, 32'sd10, 32'sd14, 32'sd20, 32'sd28, 32'sd36, 32'sd40
+    );
     assign track_pan_target_step = scale_limit_step(track_pan_raw_step, track_bw, TRACK_PAN_MAX_STEP);
     assign track_tilt_target_step = scale_limit_step(track_tilt_raw_step, track_bh, TRACK_TILT_MAX_STEP);
     assign track_pan_step = accel_limit_step(track_pan_target_step, last_track_pan_step, TRACK_PAN_ACCEL_STEP);
@@ -151,49 +160,61 @@ module pl_goal_compute_axi #(
 
     function signed [31:0] box_lock;
         input [15:0] box_dim;
-        reg signed [31:0] half_box;
+        input is_tilt;
+        reg signed [31:0] candidate;
+        reg signed [31:0] min_lock;
+        reg signed [31:0] max_lock;
         begin
-            half_box = $signed({16'h0, box_dim}) >>> 1;
-            if (half_box < TRACK_MIN_LOCK) begin
-                box_lock = TRACK_MIN_LOCK;
-            end else if (half_box > TRACK_MAX_LOCK) begin
-                box_lock = TRACK_MAX_LOCK;
+            min_lock = is_tilt ? TRACK_TILT_MIN_LOCK : TRACK_PAN_MIN_LOCK;
+            max_lock = is_tilt ? TRACK_TILT_MAX_LOCK : TRACK_PAN_MAX_LOCK;
+            candidate = is_tilt ? $signed({16'h0, box_dim}) : ($signed({16'h0, box_dim}) >>> 1);
+            if (candidate < min_lock) begin
+                box_lock = min_lock;
+            end else if (candidate > max_lock) begin
+                box_lock = max_lock;
             end else begin
-                box_lock = half_box;
+                box_lock = candidate;
             end
         end
     endfunction
 
-    function signed [31:0] shape_step;
+    function signed [31:0] shape_step_axis;
         input signed [31:0] err;
         input signed [31:0] lock_radius;
+        input signed [31:0] step0;
+        input signed [31:0] step1;
+        input signed [31:0] step2;
+        input signed [31:0] step3;
+        input signed [31:0] step4;
+        input signed [31:0] step5;
+        input signed [31:0] step6;
         reg signed [31:0] abs_err;
         reg signed [31:0] active_err;
         reg signed [31:0] mag;
         begin
             abs_err = abs32(err);
             if (abs_err <= lock_radius) begin
-                shape_step = 32'sd0;
+                shape_step_axis = 32'sd0;
             end else begin
                 active_err = abs_err - lock_radius;
                 if (active_err <= 32'sd24) begin
-                    mag = 32'sd16;
+                    mag = step0;
                 end else if (active_err <= 32'sd48) begin
-                    mag = 32'sd24;
+                    mag = step1;
                 end else if (active_err <= 32'sd72) begin
-                    mag = 32'sd36;
+                    mag = step2;
                 end else if (active_err <= 32'sd96) begin
-                    mag = 32'sd48;
+                    mag = step3;
                 end else if (active_err <= 32'sd128) begin
-                    mag = 32'sd64;
+                    mag = step4;
                 end else if (active_err <= 32'sd160) begin
-                    mag = 32'sd80;
+                    mag = step5;
                 end else if (active_err <= 32'sd200) begin
-                    mag = 32'sd96;
+                    mag = step6;
                 end else begin
-                    mag = 32'sd96;
+                    mag = step6;
                 end
-                shape_step = err > 0 ? mag : -mag;
+                shape_step_axis = err > 0 ? mag : -mag;
             end
         end
     endfunction

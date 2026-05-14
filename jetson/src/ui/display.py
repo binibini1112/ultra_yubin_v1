@@ -278,6 +278,12 @@ class AntiDroneDisplay:
         theme = STATE_THEME[sys_state]
         status = "DRONE DETECTED" if target else "SEARCHING"
         color = HUD_GREEN if target else HUD_DIM
+        with self.state.lock:
+            audio_detected = self.state.audio_detected
+            audio_age = time.time() - self.state.audio_updated_at if self.state.audio_updated_at else 999.0
+        if not target and audio_detected and audio_age < 2.0:
+            status = "AUDIO SEARCH"
+            color = HUD_AMBER
         if sys_state in (SystemState.TRACKING, SystemState.LOCKED, SystemState.ENGAGED):
             status = "DRONE TRACKING" if sys_state != SystemState.LOCKED else "DRONE LOCKED"
             color = HUD_RED if sys_state == SystemState.LOCKED else HUD_CYAN
@@ -322,6 +328,8 @@ class AntiDroneDisplay:
             reply = str(motor_info.get("fpga_reply", "") or "")
             if reply.startswith("SKIP"):
                 right += f"  {reply[:18]}"
+            elif str(motor_info.get("reply_kind", "")) == "A":
+                right += "  AUDIO"
             elif src:
                 right += f"  {src.upper()}"
             right += f"  USB {usb}"

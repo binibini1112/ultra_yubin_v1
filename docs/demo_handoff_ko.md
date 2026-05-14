@@ -97,6 +97,14 @@ Tello가 너무 작게 잡히거나 탐지가 자주 끊기면 중앙 크롭 시
 
 이 모드는 카메라 중앙 70% 영역을 잘라 다시 1280x720으로 키운다. YOLO 엔진 입력 크기 `640`은 그대로 두고, PL/모터 좌표계도 기존 1280x720 기준을 유지한다. 드론이 화면 가장자리에서 자주 사라지면 `CAMERA_CROP_SCALE=0.80 ./run_demo_crop.sh`처럼 크롭을 약하게 한다.
 
+YOLO가 잡히면 PL bbox 추적을 쓰고, YOLO가 놓치면 ReSpeaker 방향으로 탐색하게 하려면:
+
+```bash
+./run_demo_audio.sh
+```
+
+현재 기본은 `TELLO_AUDIO_MODE=doa`다. 준영이 Tello audio 모델 파일은 포함되어 있지만 이 Jetson의 ReSpeaker PCM 캡처가 불안정해서, 시현 기본값은 실제 동작 확인된 ReSpeaker USB DOA를 쓴다. 모델 판별까지 강제로 켜려면 `TELLO_AUDIO_MODE=model ./run_demo_audio.sh`를 사용한다.
+
 기존 우측 패널 HUD를 다시 보고 싶으면 실행 앞에 `UI_MINIMAL=0`을 붙인다.
 
 조금 더 빠르게 하려면:
@@ -178,6 +186,18 @@ tilt=2777
 ## 8. ReSpeaker 보조 시현
 
 ReSpeaker는 주 추적이 아니라 탐색/재획득 보조 경로로 설명한다.
+
+통합 시현은 터미널 하나에서 실행한다.
+
+```bash
+./run_demo_audio.sh
+```
+
+동작 우선순위:
+
+- YOLO target 있음: Jetson bbox -> Ultra96 PL -> pan/tilt
+- YOLO target 없음: ReSpeaker DOA -> Ultra96 PS audio command -> pan
+- 두 경로가 동시에 모터를 잡지 않도록 YOLO가 우선이다.
 
 1회 dry-run 확인:
 

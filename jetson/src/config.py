@@ -88,7 +88,9 @@ TILT_MAX = int(os.getenv("TILT_MAX", "3048"))
 PAN_DIR = int(os.getenv("PAN_DIR", "1"))
 TILT_DIR = int(os.getenv("TILT_DIR", "1"))
 
-# Kept for modules that still import audio paths, but not used by the pure YOLO GUI loop.
+# Tello audio fallback. When enabled, this is used only while YOLO has no target.
+TELLO_AUDIO_FALLBACK = os.getenv("TELLO_AUDIO_FALLBACK", "0") == "1"
+TELLO_AUDIO_MODE = os.getenv("TELLO_AUDIO_MODE", "doa").lower()
 TELLO_AUDIO_CONFIG = os.path.join(MODELS_DIR, "tello_audio_config.json")
 TELLO_AUDIO_TFLITE = os.path.join(MODELS_DIR, "tello_detector.tflite")
 TELLO_AUDIO_KERAS = os.path.join(MODELS_DIR, "tello_detector.keras")
@@ -98,3 +100,7 @@ TELLO_AUDIO_MIN_RMS = float(os.getenv("TELLO_AUDIO_MIN_RMS", "0.008"))
 TELLO_AUDIO_ALSA_DEVICE = os.getenv("TELLO_AUDIO_ALSA_DEVICE", "auto")
 TELLO_AUDIO_CHANNELS = int(os.getenv("TELLO_AUDIO_CHANNELS", "4"))
 TELLO_AUDIO_DOA_OFFSET = int(os.getenv("TELLO_AUDIO_DOA_OFFSET", "0"))
+TELLO_AUDIO_MAX_AGE_SEC = float(os.getenv("TELLO_AUDIO_MAX_AGE_SEC", "1.5"))
+TELLO_AUDIO_CONTROL_PERIOD_SEC = float(os.getenv("TELLO_AUDIO_CONTROL_PERIOD_SEC", "0.35"))
+TELLO_AUDIO_MIN_CHANGE_DEG = float(os.getenv("TELLO_AUDIO_MIN_CHANGE_DEG", "12"))
+TELLO_AUDIO_CLAMP_DEG = float(os.getenv("TELLO_AUDIO_CLAMP_DEG", "45"))

@@ -115,6 +115,9 @@ class UltraYubinMotorController:
         self.cur_pan = pan
         self.cur_tilt = tilt
         reply_kind = reply.split(",", 1)[0] if reply else ""
+        src = parsed.get("src", "")
+        if parsed.get("ps_audio", "0") == "1":
+            src = "audio"
         self.last_telemetry.update({
             "ready": True,
             "mode": "ultra_yubin",
@@ -141,7 +144,7 @@ class UltraYubinMotorController:
             "motor_ms": float(elapsed_ms),
             "target_active": int(active),
             "async_send": int(self.async_send),
-            "src": parsed.get("src", ""),
+            "src": src,
             "ctrl": parsed.get("ctrl", ""),
             "dry": parsed.get("dry", ""),
             "no_pl": parsed.get("no_pl", ""),
@@ -315,7 +318,7 @@ class UltraYubinMotorController:
         try:
             cmd = f"A {angle} {self.default_conf} 1"
             reply, elapsed_ms = self._request(cmd)
-            return self._update_from_reply(reply, elapsed_ms, 0, 0, active=1, tx_cmd=cmd)
+            return self._update_from_reply(reply, elapsed_ms, 0, 0, active=0, tx_cmd=cmd)
         except Exception as exc:
             self.ready = False
             self.last_telemetry.update({"ready": False, "fpga_reply": f"ERR,{exc}"})

@@ -18,6 +18,7 @@ if SCRIPT_DIR not in sys.path:
     sys.path.insert(0, SCRIPT_DIR)
 
 import src.config as config
+from src.audio_fallback import ReSpeakerDOA, TelloAudioFallback
 from src.control.camera import CameraStream
 from src.control.ultra_yubin_motor import UltraYubinMotorController
 from src.core.decision import DecisionMaker
@@ -117,6 +118,8 @@ def parse_args():
     parser.add_argument("--no-pipeline-log", action="store_true")
     parser.add_argument("--pipeline-echo", action="store_true")
     parser.add_argument("--pipeline-echo-every", type=int, default=30)
+    parser.add_argument("--audio-fallback", action="store_true", default=config.TELLO_AUDIO_FALLBACK)
+    parser.add_argument("--no-audio-fallback", action="store_false", dest="audio_fallback")
     return parser.parse_args()
 
 
@@ -163,6 +166,30 @@ def motor_skip_telemetry(base, reason, cx, cy, aim_cx, aim_cy, active=1):
     return telemetry
 
 
+def clamp_audio_angle(angle):
+    limit = abs(float(config.TELLO_AUDIO_CLAMP_DEG))
+    return max(-limit, min(limit, float(angle)))
+
+
+def audio_section(angle):
+    angle = float(angle)
+    if -45.0 <= angle <= 45.0:
+        return 1
+    if angle > 45.0:
+        return 2
+    if angle < -45.0:
+        return 4
+    return 3
+
+
+def audio_delta(a, b):
+    return abs(((float(a) - float(b) + 180.0) % 360.0) - 180.0)
+
+
+def normalize_audio_angle(angle):
+    return ((float(angle) + 180.0) % 360.0) - 180.0
+
+
 def main():
     args = parse_args()
     os.environ["YOLO_DEVICE"] = str(args.device)
@@ -183,6 +210,37 @@ def main():
     cam = CameraStream(args.camera).start()
     detector = VisionDetector(args.model)
     analyzer = ThreatAnalyzer(config.CAMERA_WIDTH, config.CAMERA_HEIGHT)
+    audio = None
+    audio_mode = str(config.TELLO_AUDIO_MODE).lower()
+    if args.audio_fallback:
+        try:
+            if audio_mode == "model":
+                audio = TelloAudioFallback(
+                    config.TELLO_AUDIO_TFLITE,
+                    config.TELLO_AUDIO_CONFIG,
+                    alsa_device=config.TELLO_AUDIO_ALSA_DEVICE,
+                    channels=config.TELLO_AUDIO_CHANNELS,
+                    threshold=config.TELLO_AUDIO_THRESHOLD,
+                    consecutive=config.TELLO_AUDIO_CONSECUTIVE,
+                    min_rms=config.TELLO_AUDIO_MIN_RMS,
+                    doa_offset=config.TELLO_AUDIO_DOA_OFFSET,
+                ).start()
+                audio_device = audio.alsa_device
+            else:
+                audio_mode = "doa"
+                audio = ReSpeakerDOA(offset=config.TELLO_AUDIO_DOA_OFFSET)
+                audio_device = "respeaker-usb-doa"
+            state.update_audio_status("AUDIO READY", 0.0, 0.0, None, None, False)
+            print(
+                f"[audio] fallback=on mode={audio_mode} device={audio_device} "
+                f"threshold={config.TELLO_AUDIO_THRESHOLD} "
+                f"consecutive={config.TELLO_AUDIO_CONSECUTIVE} "
+                f"offset={config.TELLO_AUDIO_DOA_OFFSET}"
+            )
+        except Exception as exc:
+            audio = None
+            state.update_audio_status(f"AUDIO ERROR: {exc}", 0.0, 0.0, None, None, False, add_log=True)
+            print(f"[audio] fallback disabled: {exc}")
 
     print(
         f"[jetson] camera={args.camera} source={cam.active_source} "
@@ -196,6 +254,8 @@ def main():
     started = time.perf_counter()
     last_telemetry = motor.last_telemetry
     threat_info = None
+    last_audio_sent = 0.0
+    last_audio_angle = None
 
     try:
         while True:
@@ -209,6 +269,7 @@ def main():
             result = detector.track(frame)
             _visible_ids, target_visible, bboxes = decision.process_tracking(frame, result)
             state.update_vision_status(target_visible)
+            audio_detection = None
 
             target = None
             for box in bboxes:
@@ -261,9 +322,64 @@ def main():
             else:
                 no_target_count += 1
                 threat_info = None
-                if frame_idx % 30 == 0:
+                if audio and audio_mode == "model":
+                    audio_detection = audio.get_detection(config.TELLO_AUDIO_MAX_AGE_SEC)
+                elif audio and audio_mode == "doa":
+                    raw_angle = audio.read()
+                    audio_detection = {
+                        "angle": normalize_audio_angle(raw_angle),
+                        "raw_angle": int(raw_angle),
+                        "score": 1.0,
+                        "rms": 0.0,
+                        "mode": "doa",
+                    }
+                else:
+                    audio_detection = None
+                if audio_detection:
+                    audio_angle = clamp_audio_angle(audio_detection["angle"])
+                    section = audio_section(audio_angle)
+                    state.update_audio_status(
+                        "AUDIO TELLO" if audio_mode == "model" else "AUDIO DOA",
+                        audio_detection.get("score", 0.0),
+                        audio_detection.get("rms", 0.0),
+                        audio_angle,
+                        section,
+                        True,
+                    )
+                    now = time.perf_counter()
+                    should_send_audio = (
+                        now - last_audio_sent >= float(config.TELLO_AUDIO_CONTROL_PERIOD_SEC)
+                        and (
+                            last_audio_angle is None
+                            or audio_delta(audio_angle, last_audio_angle) >= float(config.TELLO_AUDIO_MIN_CHANGE_DEG)
+                        )
+                    )
+                    if should_send_audio:
+                        last_telemetry = motor.turn_to_doa(audio_angle)
+                        last_audio_sent = time.perf_counter()
+                        last_audio_angle = audio_angle
+                        event = "audio_fallback"
+                    else:
+                        last_telemetry = motor_skip_telemetry(
+                            last_telemetry,
+                            "audio_rate",
+                            camera_center_x,
+                            camera_center_y,
+                            camera_center_x,
+                            camera_center_y,
+                            active=0,
+                        )
+                        event = "audio_hold"
+                elif audio:
+                    if frame_idx % 30 == 0:
+                        state.update_audio_status("AUDIO LISTEN", 0.0, 0.0, None, None, False)
+                        last_telemetry = motor.read_status()
+                    event = "no_target"
+                elif frame_idx % 30 == 0:
                     last_telemetry = motor.read_status()
-                event = "no_target"
+                    event = "no_target"
+                else:
+                    event = "no_target"
 
             decision.update_engagement_state(target_visible, threat_info)
             if target_visible and state.system_state == SystemState.DETECTED:
@@ -286,6 +402,7 @@ def main():
                         "cx": camera_center_x,
                         "cy": camera_center_y,
                     },
+                    "audio": audio_detection or {},
                 },
             )
 
@@ -322,6 +439,8 @@ def main():
         )
         pipeline.close()
         cam.stop()
+        if audio:
+            audio.stop()
         motor.stop()
         if display:
             try:

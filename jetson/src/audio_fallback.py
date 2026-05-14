@@ -110,7 +110,7 @@ class TelloAudioFallback:
     ):
         self.model_path = model_path
         self.config_path = config_path
-        self.alsa_device = alsa_device
+        self.alsa_device = self._resolve_alsa_device(alsa_device)
         self.channels = int(channels)
         self.threshold = float(threshold)
         self.consecutive = int(consecutive)
@@ -126,6 +126,35 @@ class TelloAudioFallback:
         self._input = self._interpreter.get_input_details()[0]
         self._output = self._interpreter.get_output_details()[0]
         self._doa = ReSpeakerDOA(offset=doa_offset)
+
+    def _resolve_alsa_device(self, alsa_device):
+        if alsa_device and str(alsa_device).lower() not in ("auto", "default"):
+            return alsa_device
+        try:
+            out = subprocess.check_output(
+                ["arecord", "-l"],
+                text=True,
+                stderr=subprocess.STDOUT,
+                timeout=1.5,
+            )
+        except Exception:
+            return "plughw:CARD=ArrayUAC10,DEV=0"
+        for line in out.splitlines():
+            if "ReSpeaker" not in line and "ArrayUAC10" not in line:
+                continue
+            card_match = None
+            dev_match = None
+            for token in line.replace(":", " ").replace(",", " ").split():
+                if card_match is None and token.isdigit():
+                    card_match = token
+                elif card_match is not None and dev_match is None and token.isdigit():
+                    dev_match = token
+                    break
+            if "ArrayUAC10" in line:
+                return "plughw:CARD=ArrayUAC10,DEV=0"
+            if card_match is not None:
+                return f"plughw:{card_match},{dev_match or 0}"
+        return "plughw:CARD=ArrayUAC10,DEV=0"
 
     def _load_config(self):
         with open(self.config_path, "r", encoding="utf-8") as f:

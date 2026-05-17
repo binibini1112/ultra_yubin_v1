@@ -554,6 +554,7 @@ def main():
     smooth_target_center = None
     last_raw_target_center = None
     last_motor_target_center = None
+    lead_velocity = None
     pending_jump_center = None
     lost_since = None
     last_laser_target_seen = 0.0
@@ -628,12 +629,13 @@ def main():
                 raw_cx = int((x1 + x2) / 2)
                 raw_cy = int((y1 + y2) / 2)
                 raw_target_center = (raw_cx, raw_cy)
-                if last_raw_target_center is None:
+                previous_raw_target_center = last_raw_target_center
+                if previous_raw_target_center is None:
                     target_jump_px = 0.0
                 else:
                     target_jump_px = math.hypot(
-                        raw_target_center[0] - last_raw_target_center[0],
-                        raw_target_center[1] - last_raw_target_center[1],
+                        raw_target_center[0] - previous_raw_target_center[0],
+                        raw_target_center[1] - previous_raw_target_center[1],
                     )
                 last_raw_target_center = raw_target_center
                 bw = int(x2 - x1)
@@ -662,8 +664,36 @@ def main():
                 motor_min_h = int(getattr(config, "TRACK_MOTOR_MIN_H", 0))
                 aim_x = camera_center_x + int(getattr(motor, "aim_offset_x", 0))
                 aim_y = camera_center_y + int(getattr(motor, "aim_offset_y", 0))
-                raw_err_x = raw_cx - aim_x
-                raw_err_y = raw_cy - aim_y
+                motor_raw_cx = raw_cx
+                motor_raw_cy = raw_cy
+                lead_frames = max(0.0, float(getattr(config, "TRACK_LEAD_FRAMES", 0.0)))
+                lead_min_conf = float(getattr(config, "TRACK_LEAD_MIN_CONF", 0.65))
+                if (
+                    lead_frames > 0.0
+                    and previous_raw_target_center is not None
+                    and not held
+                    and conf >= lead_min_conf
+                ):
+                    inst_vx = float(raw_cx - previous_raw_target_center[0])
+                    inst_vy = float(raw_cy - previous_raw_target_center[1])
+                    lead_alpha = max(0.0, min(1.0, float(getattr(config, "TRACK_LEAD_VELOCITY_ALPHA", 0.55))))
+                    reset_jump_px = float(getattr(config, "TRACK_LEAD_RESET_JUMP_PX", 240.0))
+                    if lead_velocity is None or target_jump_px > reset_jump_px:
+                        lead_velocity = (inst_vx, inst_vy)
+                    else:
+                        lead_velocity = (
+                            lead_velocity[0] + (inst_vx - lead_velocity[0]) * lead_alpha,
+                            lead_velocity[1] + (inst_vy - lead_velocity[1]) * lead_alpha,
+                        )
+                    max_lead_px = max(0.0, float(getattr(config, "TRACK_LEAD_MAX_PX", 80.0)))
+                    lead_dx = max(-max_lead_px, min(max_lead_px, lead_velocity[0] * lead_frames))
+                    lead_dy = max(-max_lead_px, min(max_lead_px, lead_velocity[1] * lead_frames))
+                    motor_raw_cx = max(0, min(frame_w, int(round(raw_cx + lead_dx))))
+                    motor_raw_cy = max(0, min(frame_h, int(round(raw_cy + lead_dy))))
+                elif target_jump_px > float(getattr(config, "TRACK_LEAD_RESET_JUMP_PX", 240.0)):
+                    lead_velocity = None
+                raw_err_x = motor_raw_cx - aim_x
+                raw_err_y = motor_raw_cy - aim_y
                 center_locked = (
                     abs(raw_err_x) <= int(getattr(config, "TRACK_CENTER_LOCK_X_PX", 0))
                     and abs(raw_err_y) <= int(getattr(config, "TRACK_CENTER_LOCK_Y_PX", 0))
@@ -861,6 +891,7 @@ def main():
                     smooth_target_center = None
                     last_raw_target_center = None
                     last_motor_target_center = None
+                    lead_velocity = None
                     pending_jump_center = None
                 else:
                     # Keep the motor at its last commanded pose. Also keep the

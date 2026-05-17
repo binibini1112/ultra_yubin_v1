@@ -66,8 +66,10 @@ UI_SCREEN_WIDTH = int(os.getenv("UI_SCREEN_WIDTH", "0"))
 UI_SCREEN_HEIGHT = int(os.getenv("UI_SCREEN_HEIGHT", "0"))
 UI_PANEL_WIDTH = int(os.getenv("UI_PANEL_WIDTH", "360"))
 UI_CAMERA_FIT_MODE = os.getenv("UI_CAMERA_FIT_MODE", "stretch")
+UI_SHOW_RETICLE = os.getenv("UI_SHOW_RETICLE", "1") == "1"
 UI_RETICLE_FOLLOW_TARGET = os.getenv("UI_RETICLE_FOLLOW_TARGET", "0") == "1"
 UI_SHOW_CAMERA_CENTER = os.getenv("UI_SHOW_CAMERA_CENTER", "1") == "1"
+UI_SHOW_BBOX_LABEL = os.getenv("UI_SHOW_BBOX_LABEL", "1") == "1"
 
 # Tracking / state-machine parameters used by copied jh modules.
 DETECT_CONFIRM_FRAMES = int(os.getenv("DETECT_CONFIRM_FRAMES", "4"))

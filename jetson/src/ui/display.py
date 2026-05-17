@@ -78,7 +78,8 @@ class AntiDroneDisplay:
 
         reticle_color = GREEN if target_visible else AMBER if audio_detected and audio_age < 2.0 else MUTED
         self._draw_target_box(frame, target)
-        self._draw_reticle(frame, reticle_x, reticle_y, reticle_color)
+        if getattr(config, "UI_SHOW_RETICLE", True):
+            self._draw_reticle(frame, reticle_x, reticle_y, reticle_color)
         self._draw_top_status(frame, fps, state, target, audio_detected, audio_status, audio_score, audio_doa, audio_age)
         self._draw_motor_hint(frame, motor_info)
 
@@ -109,8 +110,9 @@ class AntiDroneDisplay:
         cy = (y1 + y2) // 2
         cv2.line(frame, (cx - 12, cy), (cx + 12, cy), color, 2, cv2.LINE_AA)
         cv2.line(frame, (cx, cy - 12), (cx, cy + 12), color, 2, cv2.LINE_AA)
-        label = f"DRONE {conf:.2f}"
-        self._label(frame, label, x1, max(26, y1 - 8), color)
+        if getattr(config, "UI_SHOW_BBOX_LABEL", True):
+            label = f"DRONE {conf:.2f}"
+            self._label(frame, label, x1, max(26, y1 - 8), color)
 
     def _draw_top_status(self, frame, fps, state, target, audio_detected,
                          audio_status, audio_score, audio_doa, audio_age):

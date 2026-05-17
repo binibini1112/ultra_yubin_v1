@@ -1,6 +1,52 @@
 # ultra_yubin_v1 Tracking Tuning Status
 
-Last updated: 2026-05-15
+Last updated: 2026-05-17
+
+## 2026-05-17 Demo Candidate Summary
+
+Current best stable command:
+
+```bash
+cd /home/jetson/ultra_yubin_v1
+./run_demo_pl_drive.sh --pipeline-echo --pipeline-echo-every 30
+```
+
+Use this as the rollback baseline. It drives tracking through the Ultra96 PL
+path (`src=pl`) and keeps the PS-best control law mirrored in RTL. This is the
+best currently verified presentation path because it gives the FPGA/PL a real
+role: bbox error to pan/tilt goal computation.
+
+Reference commit:
+
+```text
+f3f4a72 pl: mirror ps best tracking profile
+```
+
+Jetson-side experimental improvement:
+
+```bash
+cd /home/jetson/ultra_yubin_v1
+./run_demo_pl_drive_lead1.sh --pipeline-echo --pipeline-echo-every 30
+```
+
+This keeps the same PL-drive motor path, but Jetson sends a small predicted
+bbox center based on bbox velocity:
+
+- `TRACK_LEAD_FRAMES=1.0`
+- `TRACK_LEAD_MAX_PX=70`
+- `TRACK_MOTOR_MIN_CONF=0.60`
+- `ULTRA_CHAN_CONTROL_PERIOD_SEC=0.007`
+- `ULTRA_YUBIN_V1_PROFILE_ACCEL=170`
+- `ULTRA_YUBIN_V1_PROFILE_VELOCITY=370`
+
+Observed test note from 2026-05-17 16:51 KST:
+
+- Command: `./run_demo_pl_drive_lead1.sh --pipeline-echo --pipeline-echo-every 30`
+- Average FPS: `36.9`
+- User visual impression: acceptable / promising
+- Risk: if YOLO bbox jumps, lead compensation can over-lead or aim at a false
+  motion direction. If that happens, immediately roll back to the stable
+  `run_demo_pl_drive.sh` command above.
 
 ## Current Goal
 

@@ -76,7 +76,48 @@ python3 -c "import socket; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.
 
 현재 PL 감쇠 RTL이면 `PLTEST`에서 대략 `before_pan=2074`, `after_pan=2086`, `src=pl` 계열이 나온다.
 
-## 5. 시현 실행
+## 5. 2026-05-17 현재 최우선 실행 후보
+
+현재까지 실제 비행 체감 기준으로 가장 안정적인 기본 후보는 PL-drive이다.
+
+```bash
+cd /home/jetson/ultra_yubin_v1
+./run_demo_pl_drive.sh --pipeline-echo --pipeline-echo-every 30
+```
+
+이 명령은 다음 의미를 가진다.
+
+- Jetson: 카메라 캡처, YOLO/TensorRT bbox 검출, 추적 상태 판단
+- Ultra96 PL: bbox 중심 오차 기반 pan/tilt goal 계산
+- Ultra96 PS: UDP/AXI/USB-U2D2 브릿지
+- Dynamixel: PL 계산 결과를 기준으로 pan/tilt 구동
+
+교수님 발표에서는 이 버전을 기준으로 “PS에서 잘 되던 추적 제어식을 RTL로 옮겨 PL에서 결정론적으로 goal을 계산한다”고 설명한다. 단, YOLO 추론 자체를 FPGA로 돌리는 것은 아니므로 그렇게 말하면 안 된다.
+
+현재 기준 백업 커밋:
+
+```text
+f3f4a72 pl: mirror ps best tracking profile
+```
+
+Jetson 쪽에서만 lead 보상을 추가한 실험 후보는 아래 명령이다.
+
+```bash
+cd /home/jetson/ultra_yubin_v1
+./run_demo_pl_drive_lead1.sh --pipeline-echo --pipeline-echo-every 30
+```
+
+이 버전은 PL-drive는 그대로 쓰고, Jetson에서 bbox 이동 속도를 보고 약 1프레임 앞의 중심점을 PL로 보내는 실험이다. 2026-05-17 16:51 테스트에서 `avg_fps=36.9`가 나왔고 체감도 괜찮았다. 다만 lead 보상은 bbox가 튀면 앞질러 갈 수 있으므로, 시연 직전에는 반드시 기본 PL-drive와 비교한 뒤 선택한다.
+
+롤백 기준:
+
+```bash
+./run_demo_pl_drive.sh --pipeline-echo --pipeline-echo-every 30
+```
+
+위 명령으로 돌아오면 lead 보상 없이 현재 가장 검증된 PL-drive 상태로 복귀한다.
+
+## 6. 기존 보수 실행
 
 긴 명령을 실수 없이 쓰기 위해 `run_demo.sh`를 사용한다.
 

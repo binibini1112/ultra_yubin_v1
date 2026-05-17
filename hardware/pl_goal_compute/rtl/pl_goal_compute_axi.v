@@ -46,8 +46,14 @@ module pl_goal_compute_axi #(
 
     localparam [31:0] GOAL_MIN = 32'd0;
     localparam [31:0] GOAL_MAX = 32'd4095;
+    // PS-best tracking profile mirrored in RTL:
+    // correction = trunc_toward_zero(pixel_error * NUM / DEN), then clamp.
+    // This matches ps_track_step() in pl_udp_usb_dxl_bridge.c so PL-drive can
+    // replace PS-direct without changing the external Jetson bbox protocol.
     localparam signed [31:0] TRACK_DEADBAND_X = 32'sd14;
     localparam signed [31:0] TRACK_DEADBAND_Y = 32'sd14;
+    localparam signed [31:0] TRACK_TICK_PER_PIXEL_NUM = 32'sd1;
+    localparam signed [31:0] TRACK_TICK_PER_PIXEL_DEN = 32'sd8;
     localparam signed [31:0] TRACK_MAX_CORRECTION_X = 32'sd72;
     localparam signed [31:0] TRACK_MAX_CORRECTION_Y = 32'sd72;
     localparam signed [31:0] TRACK_MAX_CORRECTION_CLOSE_X = 32'sd32;
@@ -162,14 +168,26 @@ module pl_goal_compute_axi #(
         end
     endfunction
 
-    function signed [31:0] div8_trunc_zero;
-        input signed [31:0] value;
+    function signed [31:0] div64_trunc_zero;
+        input signed [63:0] value;
+        input signed [31:0] denom;
+        reg signed [63:0] quotient;
         begin
-            if (value < 32'sd0) begin
-                div8_trunc_zero = -((-value) >>> 3);
+            if (value < 64'sd0) begin
+                quotient = -((-value) / denom);
             end else begin
-                div8_trunc_zero = value >>> 3;
+                quotient = value / denom;
             end
+            div64_trunc_zero = quotient[31:0];
+        end
+    endfunction
+
+    function signed [31:0] track_scaled_error;
+        input signed [31:0] err;
+        reg signed [63:0] product;
+        begin
+            product = $signed(err) * $signed(TRACK_TICK_PER_PIXEL_NUM);
+            track_scaled_error = div64_trunc_zero(product, TRACK_TICK_PER_PIXEL_DEN);
         end
     endfunction
 
@@ -181,7 +199,7 @@ module pl_goal_compute_axi #(
             if (abs32(err) <= deadband) begin
                 ps_direct_step = 32'sd0;
             end else begin
-                ps_direct_step = clamp_signed_mag(div8_trunc_zero(err), max_correction);
+                ps_direct_step = clamp_signed_mag(track_scaled_error(err), max_correction);
             end
         end
     endfunction

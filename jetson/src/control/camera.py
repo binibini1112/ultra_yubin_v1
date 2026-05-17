@@ -93,6 +93,36 @@ class CameraStream:
         ctrl_arg = ",".join(f"{name}={int(value)}" for name, value in controls.items())
         return self._run_v4l2([f"--set-ctrl={ctrl_arg}"]) is not None
 
+    def _set_control_if_supported(self, name, value):
+        return self._set_controls({name: value})
+
+    def _apply_startup_settings(self):
+        if not bool(getattr(config, "CAMERA_APPLY_SETTINGS", False)):
+            return
+        ordered_controls = [
+            ("auto_exposure", config.CAMERA_AUTO_EXPOSURE),
+            ("exposure_time_absolute", config.CAMERA_EXPOSURE),
+            ("gain", config.CAMERA_GAIN),
+            ("brightness", config.CAMERA_BRIGHTNESS),
+            ("contrast", config.CAMERA_CONTRAST),
+            ("saturation", config.CAMERA_SATURATION),
+            ("sharpness", config.CAMERA_SHARPNESS),
+            ("backlight_compensation", config.CAMERA_BACKLIGHT),
+            ("gamma", config.CAMERA_GAMMA),
+        ]
+        applied = []
+        for name, value in ordered_controls:
+            if self._set_control_if_supported(name, value):
+                applied.append(f"{name}={int(value)}")
+        self._set_stream_prop("CAP_PROP_AUTO_EXPOSURE", config.CAMERA_AUTO_EXPOSURE)
+        self._set_stream_prop("CAP_PROP_EXPOSURE", config.CAMERA_EXPOSURE)
+        self._set_stream_prop("CAP_PROP_GAIN", config.CAMERA_GAIN)
+        self._set_stream_prop("CAP_PROP_BRIGHTNESS", config.CAMERA_BRIGHTNESS)
+        self._set_stream_prop("CAP_PROP_CONTRAST", config.CAMERA_CONTRAST)
+        if applied:
+            print(f"[CAMERA] startup settings {' '.join(applied)}")
+            print(f"[CAMERA] startup status {self._status_text()}")
+
     def _set_stream_prop(self, prop_name, value):
         if self.stream is None:
             return False
@@ -103,25 +133,6 @@ class CameraStream:
             return bool(self.stream.set(prop, float(value)))
         except Exception:
             return False
-
-    def apply_glare_defaults(self, label="defaults"):
-        """Force a stable low-glare manual exposure preset for this camera."""
-        ok = self._set_controls({"auto_exposure": 1})
-        ok = self._set_controls({
-            "exposure_time_absolute": config.CAMERA_GLARE_RESET_EXPOSURE,
-            "gain": config.CAMERA_GLARE_RESET_GAIN,
-            "backlight_compensation": config.CAMERA_GLARE_RESET_BACKLIGHT,
-        }) or ok
-        self._set_stream_prop("CAP_PROP_AUTO_EXPOSURE", 1)
-        self._set_stream_prop("CAP_PROP_EXPOSURE", config.CAMERA_GLARE_RESET_EXPOSURE)
-        self._set_stream_prop("CAP_PROP_GAIN", config.CAMERA_GLARE_RESET_GAIN)
-        self._set_stream_prop(
-            "CAP_PROP_BACKLIGHT",
-            config.CAMERA_GLARE_RESET_BACKLIGHT,
-        )
-        if ok:
-            print(f"[CAMERA] glare {label} {self._status_text()}")
-        return ok
 
     def _status_text(self):
         auto_exp = self._get_control("auto_exposure", -1)
@@ -187,7 +198,27 @@ class CameraStream:
             return
 
         if action == "reset":
-            self.apply_glare_defaults("reset")
+            # Return only glare-related controls to the camera defaults.
+            if self._set_controls({
+                    "gain": config.CAMERA_GLARE_RESET_GAIN,
+                    "backlight_compensation": config.CAMERA_GLARE_RESET_BACKLIGHT,
+                    "auto_exposure": 3,
+            }):
+                self._set_controls({
+                    "auto_exposure": 1,
+                    "exposure_time_absolute": config.CAMERA_GLARE_RESET_EXPOSURE,
+                })
+                self._set_controls({"auto_exposure": 3})
+                self._set_stream_prop("CAP_PROP_GAIN", config.CAMERA_GLARE_RESET_GAIN)
+                self._set_stream_prop(
+                    "CAP_PROP_BACKLIGHT",
+                    config.CAMERA_GLARE_RESET_BACKLIGHT,
+                )
+                self._set_stream_prop("CAP_PROP_EXPOSURE", config.CAMERA_GLARE_RESET_EXPOSURE)
+                self._set_stream_prop("CAP_PROP_AUTO_EXPOSURE", 3)
+                print(
+                    f"[CAMERA] glare reset {self._status_text()}"
+                )
 
     def _connect(self):
         for i in range(self.max_retries):
@@ -200,8 +231,6 @@ class CameraStream:
                 print(f"[INFO] 카메라 {source} 연결 시도 중... ({i+1}/{self.max_retries})")
                 stream = self._open_source(source)
                 if stream.isOpened():
-                    self.stream = stream
-                    self.active_source = source
                     if config.CAMERA_FOURCC:
                         fourcc = cv2.VideoWriter_fourcc(*config.CAMERA_FOURCC)
                         stream.set(cv2.CAP_PROP_FOURCC, fourcc)
@@ -209,13 +238,14 @@ class CameraStream:
                     stream.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
                     stream.set(cv2.CAP_PROP_FPS,          config.CAMERA_FPS)
                     stream.set(cv2.CAP_PROP_BUFFERSIZE,   1)
-                    if config.CAMERA_APPLY_GLARE_DEFAULTS:
-                        self.apply_glare_defaults("startup")
                     grabbed, frame = stream.read()
                     if grabbed and frame is not None:
+                        self.stream = stream
                         self.frame = frame
                         self.grabbed = True
+                        self.active_source = source
                         self._miss_count = 0
+                        self._apply_startup_settings()
                         h, w = self.frame.shape[:2]
                         actual_fps = stream.get(cv2.CAP_PROP_FPS)
                         actual_fourcc = int(stream.get(cv2.CAP_PROP_FOURCC))
@@ -234,9 +264,6 @@ class CameraStream:
                     stream.release()
                 except Exception:
                     pass
-                if self.stream is stream:
-                    self.stream = None
-                    self.active_source = None
             print(f"[WARN] 카메라 {self.camera_id} 연결 실패. 1.5초 후 재시도...")
             time.sleep(1.5)
         print(f"[ERROR] 카메라 {self.camera_id} 최종 연결 실패.")
@@ -268,26 +295,20 @@ class CameraStream:
                 if self._miss_count < 30:
                     time.sleep(0.02)
                     continue
-            time.sleep(0.01)
+            sleep_sec = float(getattr(config, "CAMERA_THREAD_SLEEP_SEC", 0.001))
+            if sleep_sec > 0.0:
+                time.sleep(sleep_sec)
 
     def read(self):
         if self.frame is None:
             return np.zeros((config.CAMERA_HEIGHT, config.CAMERA_WIDTH, 3), np.uint8)
         frame = self.frame.copy()
-        if config.CAMERA_FLIP_VERTICAL:
+        if getattr(config, "CAMERA_ROTATE_180", False):
+            frame = cv2.rotate(frame, cv2.ROTATE_180)
+        if getattr(config, "CAMERA_FLIP_VERTICAL", False):
             frame = cv2.flip(frame, 0)
         if getattr(config, "CAMERA_FLIP_HORIZONTAL", False):
             frame = cv2.flip(frame, 1)
-        if getattr(config, "CAMERA_CENTER_CROP", False):
-            scale = max(0.35, min(1.0, float(config.CAMERA_CROP_SCALE)))
-            if scale < 0.999:
-                h, w = frame.shape[:2]
-                crop_w = max(1, int(w * scale))
-                crop_h = max(1, int(h * scale))
-                x0 = (w - crop_w) // 2
-                y0 = (h - crop_h) // 2
-                frame = frame[y0:y0 + crop_h, x0:x0 + crop_w]
-                frame = cv2.resize(frame, (w, h), interpolation=cv2.INTER_LINEAR)
         return frame
 
     def stop(self):

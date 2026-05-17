@@ -28,8 +28,8 @@ from src.audio_fallback import ReSpeakerDOA
 from src.control.ultra_yubin_motor import UltraYubinMotorController
 
 
-def normalize_relative_angle(angle, clamp_deg=90.0):
-    rel = ((float(angle) + 180.0) % 360.0) - 180.0
+def normalize_relative_angle(angle, clamp_deg=180.0, front_doa_deg=90.0, sign=1.0):
+    rel = ((float(angle) - float(front_doa_deg)) * float(sign) + 180.0) % 360.0 - 180.0
     if clamp_deg is not None:
         limit = abs(float(clamp_deg))
         rel = max(-limit, min(limit, rel))
@@ -48,10 +48,16 @@ def parse_args():
     parser.add_argument("--port", type=int, default=int(os.getenv("ULTRA_YUBIN_PORT", "5016")))
     parser.add_argument("--timeout-sec", type=float, default=float(os.getenv("ULTRA_YUBIN_TIMEOUT_SEC", "0.08")))
     parser.add_argument("--offset", type=int, default=int(os.getenv("ULTRA_YUBIN_DOA_OFFSET", "0")))
+    parser.add_argument("--front-doa-deg", type=float,
+                        default=float(os.getenv("TELLO_AUDIO_MOTOR_ZERO_DOA_DEG", "90")),
+                        help="ReSpeaker DOA angle that maps to motor/front 0 deg")
+    parser.add_argument("--sign", type=float,
+                        default=float(os.getenv("TELLO_AUDIO_DOA_SIGN", "1")),
+                        help="Motor angle sign after subtracting front-doa-deg")
     parser.add_argument("--period-sec", type=float, default=0.10)
     parser.add_argument("--min-change-deg", type=float, default=4.0)
     parser.add_argument("--keepalive-sec", type=float, default=1.0)
-    parser.add_argument("--clamp-deg", type=float, default=90.0)
+    parser.add_argument("--clamp-deg", type=float, default=180.0)
     parser.add_argument("--no-clamp", action="store_true")
     parser.add_argument("--center-on-start", action="store_true")
     parser.add_argument("--once", action="store_true")
@@ -79,6 +85,7 @@ def main():
 
     print(
         f"[respeaker-bridge] host={args.host}:{args.port} offset={args.offset} "
+        f"front_doa={args.front_doa_deg} sign={args.sign} "
         f"period={args.period_sec}s min_change={args.min_change_deg}deg "
         f"clamp={'off' if clamp_deg is None else clamp_deg} dry_run={int(args.dry_run)}"
     )
@@ -91,7 +98,12 @@ def main():
         while True:
             now = time.monotonic()
             raw_angle = doa.read()
-            rel_angle = normalize_relative_angle(raw_angle, clamp_deg=clamp_deg)
+            rel_angle = normalize_relative_angle(
+                raw_angle,
+                clamp_deg=clamp_deg,
+                front_doa_deg=args.front_doa_deg,
+                sign=args.sign,
+            )
             send = (
                 last_sent_angle is None
                 or angle_delta(rel_angle, last_sent_angle) >= args.min_change_deg
@@ -102,11 +114,11 @@ def main():
             if send:
                 out_angle = int(round(rel_angle))
                 if args.dry_run:
-                    print(f"[respeaker-bridge] raw={raw_angle:3d} rel={out_angle:4d} dry-run")
+                    print(f"[respeaker-bridge] raw={raw_angle:3d} motor={out_angle:4d} dry-run")
                 else:
                     telemetry = motor.turn_to_doa(out_angle)
                     print(
-                        f"[respeaker-bridge] raw={raw_angle:3d} rel={out_angle:4d} "
+                        f"[respeaker-bridge] raw={raw_angle:3d} motor={out_angle:4d} "
                         f"pan={telemetry.get('pan')} tilt={telemetry.get('tilt')} "
                         f"usb={telemetry.get('usb_ok')} reply={telemetry.get('fpga_reply', '')}"
                     )

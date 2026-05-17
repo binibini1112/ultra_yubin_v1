@@ -1,0 +1,1695 @@
+{
+  "type": "bbox_height_to_laser_tick",
+  "samples": [
+    {
+      "bbox_h": 22.65,
+      "bbox_w": 74.05,
+      "bbox_area": 1677.1,
+      "confidence": 0.7334,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:08:22+0900"
+    },
+    {
+      "bbox_h": 22.8,
+      "bbox_w": 73.4,
+      "bbox_area": 1673.5,
+      "confidence": 0.7556,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:08:21+0900"
+    },
+    {
+      "bbox_h": 34.65,
+      "bbox_w": 72.3,
+      "bbox_area": 2505.3,
+      "confidence": 0.6796,
+      "laser_id": 3,
+      "laser_tilt_tick": 2001,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:09:41+0900"
+    },
+    {
+      "bbox_h": 34.65,
+      "bbox_w": 72.3,
+      "bbox_area": 2505.3,
+      "confidence": 0.6796,
+      "laser_id": 3,
+      "laser_tilt_tick": 2001,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:09:41+0900"
+    },
+    {
+      "bbox_h": 34.65,
+      "bbox_w": 72.3,
+      "bbox_area": 2505.3,
+      "confidence": 0.6796,
+      "laser_id": 3,
+      "laser_tilt_tick": 2001,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:09:42+0900"
+    },
+    {
+      "bbox_h": 52.8,
+      "bbox_w": 166.75,
+      "bbox_area": 8804.6,
+      "confidence": 0.8892,
+      "laser_id": 3,
+      "laser_tilt_tick": 1981,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:07:48+0900"
+    },
+    {
+      "bbox_h": 52.85,
+      "bbox_w": 166.8,
+      "bbox_area": 8815.45,
+      "confidence": 0.8878,
+      "laser_id": 3,
+      "laser_tilt_tick": 1981,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:07:47+0900"
+    },
+    {
+      "bbox_h": 54.6,
+      "bbox_w": 167.8,
+      "bbox_area": 9164.15,
+      "confidence": 0.8853,
+      "laser_id": 3,
+      "laser_tilt_tick": 1981,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:07:48+0900"
+    },
+    {
+      "bbox_h": 56.75,
+      "bbox_w": 168.05,
+      "bbox_area": 9536.7,
+      "confidence": 0.8813,
+      "laser_id": 3,
+      "laser_tilt_tick": 1981,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T18:07:50+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:05+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:06+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:07+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:08+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:09+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:10+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    },
+    {
+      "bbox_h": 72.54,
+      "bbox_w": 172.88,
+      "bbox_area": 13369.69,
+      "confidence": 0.8726,
+      "laser_id": 3,
+      "laser_tilt_tick": 2005,
+      "sample_count": 20,
+      "timestamp": "2026-05-16T17:52:11+0900"
+    }
+  ]
+}

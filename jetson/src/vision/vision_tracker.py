@@ -13,7 +13,19 @@ import torch
 import numpy as np
 from ultralytics import YOLO
 
-MIN_BOX_HEIGHT = int(os.getenv("YOLO_MIN_BOX_HEIGHT", "5"))
+MIN_BOX_HEIGHT = int(os.getenv("YOLO_MIN_BOX_HEIGHT", "4"))
+TRACKER_CFG = os.getenv(
+    "YOLO_TRACKER_CFG",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "bytetrack_ultra_chan.yaml"),
+)
+
+
+def _config_default(name, default):
+    try:
+        import src.config as config
+        return getattr(config, name, default)
+    except Exception:
+        return default
 
 
 def _safe_cuda_empty_cache():
@@ -34,11 +46,15 @@ class VisionDetector:
         _safe_cuda_empty_cache()
 
         self.tracker_type = tracker
-        self.conf_thr = float(os.getenv("YOLO_CONF", "0.35"))
+        self.conf_thr = float(os.getenv("YOLO_CONF", str(_config_default("YOLO_CONF", 0.18))))
         self.infer_img_size = int(os.getenv("YOLO_IMGSZ", "640"))
-        self.skip_frames = int(os.getenv("YOLO_SKIP_FRAMES", "1"))
-        # ★ bytetrack 사용 (botsort는 옵티컬플로우 때문에 느림)
-        self._tracker_cfg = "bytetrack.yaml"
+        self.skip_frames = max(1, int(os.getenv("YOLO_SKIP_FRAMES", "2")))
+        self.fast_detect = os.getenv("YOLO_FAST_DETECT", "0") == "1"
+        self._tracker_cfg = TRACKER_CFG if os.path.exists(TRACKER_CFG) else "bytetrack.yaml"
+        try:
+            torch.backends.cudnn.benchmark = True
+        except Exception:
+            pass
 
         # ── 모델 탐색 ──
         _project = os.path.dirname(os.path.dirname(os.path.dirname(
@@ -70,6 +86,14 @@ class VisionDetector:
                 _safe_cuda_empty_cache()
                 self.model = YOLO(path, task="detect")
                 self._model_name = name
+                if name.endswith(".engine"):
+                    engine_imgsz = int(os.getenv("YOLO_ENGINE_IMGSZ", "640"))
+                    if self.infer_img_size != engine_imgsz:
+                        print(
+                            f"[VISION] TensorRT engine input is fixed at {engine_imgsz}; "
+                            f"using imgsz={engine_imgsz} instead of {self.infer_img_size}"
+                        )
+                        self.infer_img_size = engine_imgsz
                 print(f"[VISION] ✓ Loaded: {name}")
                 break
             except Exception as e:
@@ -84,11 +108,13 @@ class VisionDetector:
         self._frame_count = 0
         self._last_result = None
         self._last_infer_ms = 0.0
+        self._last_step_ms = 0.0
         self._last_track_was_skipped = False
         self._last_box_count = 0
 
+        mode = "predict" if self.fast_detect else f"track:{tracker}"
         print(f"[VISION] Conf>={self.conf_thr} | imgsz={self.infer_img_size} | "
-              f"Skip={self.skip_frames} | Tracker={tracker}")
+              f"Skip={self.skip_frames} | Mode={mode} cfg={self._tracker_cfg}")
 
     def track(self, frame, persist=True):
         self._frame_count += 1
@@ -96,20 +122,28 @@ class VisionDetector:
         # ★ 프레임 스킵 부활: 130MB 대형 모델의 끔찍한 랙 방지 (2프레임당 1번만 추론)
         if self._frame_count % self.skip_frames != 0 and self._last_result is not None:
             self._last_track_was_skipped = True
+            self._last_step_ms = 0.0
             return self._last_result
 
         started = time.perf_counter()
-        res = self.model.track(
-            frame,
-            persist=persist,
-            tracker=self._tracker_cfg,
-            verbose=False,
-            conf=self.conf_thr,
-            device=os.getenv("YOLO_DEVICE", "cuda:0"),
-            imgsz=self.infer_img_size,
-            classes=[0],
-        )[0]
+        common_kwargs = {
+            "verbose": False,
+            "conf": self.conf_thr,
+            "device": os.getenv("YOLO_DEVICE", "cuda:0"),
+            "imgsz": self.infer_img_size,
+            "classes": [0],
+        }
+        if self.fast_detect:
+            res = self.model.predict(frame, **common_kwargs)[0]
+        else:
+            res = self.model.track(
+                frame,
+                persist=persist,
+                tracker=self._tracker_cfg,
+                **common_kwargs,
+            )[0]
         self._last_infer_ms = (time.perf_counter() - started) * 1000.0
+        self._last_step_ms = self._last_infer_ms
         self._last_track_was_skipped = False
         
         filtered_res = self._filter_boxes(res)

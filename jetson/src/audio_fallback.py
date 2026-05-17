@@ -4,6 +4,7 @@ import os
 import queue
 import struct
 import subprocess
+import sys
 import threading
 import time
 
@@ -277,3 +278,138 @@ class TelloAudioFallback:
                 self._proc.terminate()
             except Exception:
                 pass
+
+
+class JunmoDroneAudioFallback:
+    """Run junmoyolo26's drone-audio detector and expose recent DOA detections.
+
+    The original junmoyolo26 path directly controlled the Jetson-side Dynamixel
+    motor. In ultra_yubin we keep the detection pipeline on Jetson, but forward
+    its detected DOA to Ultra96 PS through the normal `A angle conf valid` path.
+    """
+
+    def __init__(
+        self,
+        model_path,
+        project_root="/home/jetson/junmoyolo26",
+        alsa_device="auto",
+        channels=6,
+        threshold=0.70,
+        consecutive=2,
+        cooldown_sec=0.6,
+        min_rms=0.008,
+        doa_offset=0,
+        doa_method="auto",
+        mic_distance=0.065,
+        audio_backend="arecord",
+        verbose=False,
+    ):
+        self.project_root = project_root
+        self.model_path = model_path
+        self.alsa_device = self._resolve_alsa_device(alsa_device)
+        self.channels = int(channels)
+        self.threshold = float(threshold)
+        self.consecutive = int(consecutive)
+        self.cooldown_sec = float(cooldown_sec)
+        self.min_rms = float(min_rms)
+        self.doa_offset = float(doa_offset)
+        self.doa_method = str(doa_method)
+        self.mic_distance = float(mic_distance)
+        self.audio_backend = str(audio_backend)
+        self.verbose = bool(verbose)
+        self._latest = None
+        self._lock = threading.Lock()
+        self._thread = None
+
+    def _resolve_alsa_device(self, alsa_device):
+        if alsa_device and str(alsa_device).lower() not in ("auto", "default"):
+            return alsa_device
+        try:
+            out = subprocess.check_output(
+                ["arecord", "-l"],
+                text=True,
+                stderr=subprocess.STDOUT,
+                timeout=1.5,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"arecord -l failed while finding ReSpeaker: {exc}") from exc
+        for line in out.splitlines():
+            text = line.lower()
+            if not any(key in text for key in ("respeaker", "arrayuac10", "seeed")):
+                continue
+            parts = line.replace(":", " ").replace(",", " ").split()
+            card = None
+            dev = None
+            for idx, token in enumerate(parts):
+                if token == "card" and idx + 1 < len(parts) and parts[idx + 1].isdigit():
+                    card = parts[idx + 1]
+                if token == "device" and idx + 1 < len(parts) and parts[idx + 1].isdigit():
+                    dev = parts[idx + 1]
+            if card is not None:
+                return f"plughw:{card},{dev or 0}"
+        raise RuntimeError("ReSpeaker ALSA capture card not found in `arecord -l`")
+
+    def start(self):
+        if self._thread and self._thread.is_alive():
+            return self
+        local_audio_dir = os.path.join(os.path.dirname(__file__), "audio")
+        local_pipeline = os.path.join(local_audio_dir, "junmo_pipeline_drone.py")
+        audio_dir = local_audio_dir if os.path.exists(local_pipeline) else os.path.join(self.project_root, "src", "audio")
+        pipeline_name = "junmo_pipeline_drone" if os.path.exists(local_pipeline) else "pipeline_drone"
+        if not os.path.exists(os.path.join(audio_dir, f"{pipeline_name}.py")):
+            raise FileNotFoundError(os.path.join(audio_dir, f"{pipeline_name}.py"))
+        if not os.path.exists(self.model_path):
+            raise FileNotFoundError(self.model_path)
+        if audio_dir not in sys.path:
+            sys.path.insert(0, audio_dir)
+        pipeline_drone = __import__(pipeline_name)
+
+        def on_detect(text, doa, section, from_partial, stage, action):
+            score = 0.0
+            if isinstance(action, dict):
+                score = float(action.get("confidence", 0.0))
+            with self._lock:
+                self._latest = {
+                    "angle": float(doa),
+                    "raw_angle": float(doa),
+                    "section": int(section),
+                    "score": score,
+                    "rms": 0.0,
+                    "mode": "junmo",
+                    "time": time.time(),
+                    "text": text,
+                }
+
+        def runner():
+            pipeline_drone.run(
+                None,
+                self.channels,
+                on_detect,
+                self.model_path,
+                threshold=self.threshold,
+                consecutive=self.consecutive,
+                cooldown=self.cooldown_sec,
+                min_rms=self.min_rms,
+                doa_offset=self.doa_offset,
+                doa_method=self.doa_method,
+                mic_distance=self.mic_distance,
+                audio_backend=self.audio_backend,
+                alsa_device=self.alsa_device,
+                verbose=self.verbose,
+            )
+
+        self._thread = threading.Thread(target=runner, daemon=True)
+        self._thread.start()
+        return self
+
+    def get_detection(self, max_age_sec=1.5):
+        with self._lock:
+            latest = dict(self._latest) if self._latest else None
+        if latest and time.time() - latest["time"] <= max_age_sec:
+            return latest
+        return None
+
+    def stop(self):
+        # junmoyolo26's pipeline has no cooperative stop flag. The worker is a
+        # daemon thread, so process shutdown stops it. This keeps Ctrl+C fast.
+        pass

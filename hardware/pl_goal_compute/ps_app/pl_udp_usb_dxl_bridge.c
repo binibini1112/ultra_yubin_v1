@@ -38,13 +38,22 @@
 #define ADDR_PROFILE_VELOCITY 112u
 #define ADDR_GOAL_POSITION 116u
 #define ADDR_PRESENT_POSITION 132u
-#define TRACK_DEADBAND_X 18
-#define TRACK_DEADBAND_Y 16
+#define TRACK_DEADBAND_X 14
+#define TRACK_DEADBAND_Y 14
 #define TRACK_TICK_PER_PIXEL_NUM 1
-#define TRACK_TICK_PER_PIXEL_DEN 2
-#define TRACK_MAX_CORRECTION 900
+#define TRACK_TICK_PER_PIXEL_DEN 8
+#define TRACK_MAX_CORRECTION 72
+#define TRACK_MAX_CORRECTION_CLOSE 32
+#define TRACK_CLOSE_BOX_W 220u
+#define TRACK_CLOSE_BOX_H 160u
 #define TRACK_PAN_LIMIT_FROM_FRONT 900
-#define TRACK_TILT_LIMIT_FROM_FRONT 700
+#define TRACK_TILT_LIMIT_FROM_FRONT 240
+#define LASER_TICKS_PER_RAD 652
+#define LASER_TICKS_PER_DEG_NUM 1024
+#define LASER_TICKS_PER_DEG_DEN 90
+#define LASER_DEFAULT_DISTANCE_MM 1000u
+#define LASER_DEFAULT_VERTICAL_FOV_DEG 43u
+#define LASER_CAL_TABLE_SIZE 12u
 #define PL_CMD_SET_PAN  0x10000000u
 #define PL_CMD_SET_TILT 0x20000000u
 #define PL_CMD_SET_CX   0x30000000u
@@ -55,6 +64,8 @@
 #define PL_CMD_SET_BOX  0x80000000u
 
 static volatile sig_atomic_t g_running = 1;
+static int64_t g_track_pan_limit = TRACK_PAN_LIMIT_FROM_FRONT;
+static int64_t g_track_tilt_limit = TRACK_TILT_LIMIT_FROM_FRONT;
 
 static void on_signal(int signo)
 {
@@ -67,8 +78,13 @@ static void usage(const char *argv0)
     fprintf(stderr,
         "Usage: %s --base 0xA0000000 [--port 5016] [--serial /dev/ttyUSB0] "
         "[--baud 57600] [--pan-id 1] [--tilt-id 2] [--dry-run] [--no-pl] "
-        "[--skip-pl-init] [--skip-dxl-init] [--lazy-pl-open] [--profile-accel 90] [--profile-velocity 280] "
-        "[--center-file /home/xilinx/ultra_yubin/front_center.env]\n",
+        "[--skip-pl-init] [--skip-dxl-init] [--lazy-pl-open] "
+        "[--track-direct-ps] [--track-pl-shadow] "
+        "[--track-pan-limit 900] [--track-tilt-limit 240] "
+        "[--profile-accel 60] [--profile-velocity 180] "
+        "[--laser-id 3] [--laser-center 2048] [--laser-offset-mm 38] "
+        "[--laser-distance-mm 1000] [--laser-vertical-fov-deg 43] [--laser-sign -1] "
+        "[--center-file /home/xilinx/ultra_yubin_v1/front_center.env]\n",
         argv0);
 }
 
@@ -88,16 +104,26 @@ static uint32_t clamp_goal_i64(int64_t value)
     return (uint32_t)value;
 }
 
-static int64_t clamp_correction_i64(int64_t value)
+static int64_t clamp_correction_i64(int64_t value, int64_t max_correction)
 {
-    if (value > TRACK_MAX_CORRECTION) {
-        return TRACK_MAX_CORRECTION;
+    if (value > max_correction) {
+        return max_correction;
     }
-    if (value < -TRACK_MAX_CORRECTION) {
-        return -TRACK_MAX_CORRECTION;
+    if (value < -max_correction) {
+        return -max_correction;
     }
     return value;
 }
+
+static const uint32_t laser_cal_distance_mm[LASER_CAL_TABLE_SIZE] = {
+    250u, 500u, 750u, 1000u, 1250u, 1500u,
+    1750u, 2000u, 2250u, 2500u, 2750u, 3000u
+};
+
+static const uint32_t laser_cal_tick[LASER_CAL_TABLE_SIZE] = {
+    1920u, 1952u, 1978u, 1985u, 1992u, 2000u,
+    2000u, 2000u, 2002u, 2002u, 2006u, 2006u
+};
 
 static int goal_pair_valid(uint32_t pan_goal, uint32_t tilt_goal)
 {
@@ -105,6 +131,17 @@ static int goal_pair_valid(uint32_t pan_goal, uint32_t tilt_goal)
         return 0;
     }
     return !(pan_goal == 0u && tilt_goal == 0u);
+}
+
+static int front_center_sane(uint32_t front_pan, uint32_t front_tilt)
+{
+    if (front_pan < 512u || front_pan > 3583u) {
+        return 0;
+    }
+    if (front_tilt < 1800u || front_tilt > 3400u) {
+        return 0;
+    }
+    return 1;
 }
 
 static uint32_t clamp_around_front_i64(int64_t value, uint32_t front, int64_t limit)
@@ -134,10 +171,10 @@ static int goal_pair_near_front(uint32_t pan_goal, uint32_t tilt_goal,
     }
     int64_t pan_delta = (int64_t)pan_goal - (int64_t)front_pan;
     int64_t tilt_delta = (int64_t)tilt_goal - (int64_t)front_tilt;
-    if (pan_delta < -TRACK_PAN_LIMIT_FROM_FRONT || pan_delta > TRACK_PAN_LIMIT_FROM_FRONT) {
+    if (pan_delta < -g_track_pan_limit || pan_delta > g_track_pan_limit) {
         return 0;
     }
-    if (tilt_delta < -TRACK_TILT_LIMIT_FROM_FRONT || tilt_delta > TRACK_TILT_LIMIT_FROM_FRONT) {
+    if (tilt_delta < -g_track_tilt_limit || tilt_delta > g_track_tilt_limit) {
         return 0;
     }
     return 1;
@@ -146,11 +183,13 @@ static int goal_pair_near_front(uint32_t pan_goal, uint32_t tilt_goal,
 static void clamp_goal_pair_near_front(uint32_t *pan_goal, uint32_t *tilt_goal,
                                        uint32_t front_pan, uint32_t front_tilt)
 {
-    *pan_goal = clamp_around_front_i64((int64_t)*pan_goal, front_pan, TRACK_PAN_LIMIT_FROM_FRONT);
-    *tilt_goal = clamp_around_front_i64((int64_t)*tilt_goal, front_tilt, TRACK_TILT_LIMIT_FROM_FRONT);
+    *pan_goal = clamp_around_front_i64((int64_t)*pan_goal, front_pan, g_track_pan_limit);
+    *tilt_goal = clamp_around_front_i64((int64_t)*tilt_goal, front_tilt, g_track_tilt_limit);
 }
 
-static void ps_track_step(uint32_t cx, uint32_t cy, uint32_t fw, uint32_t fh, uint32_t valid,
+static void ps_track_step(uint32_t cx, uint32_t cy, uint32_t bw, uint32_t bh,
+                          uint32_t fw, uint32_t fh, uint32_t valid,
+                          uint32_t base_pan, uint32_t base_tilt,
                           uint32_t front_pan, uint32_t front_tilt,
                           uint32_t *pan_goal, uint32_t *tilt_goal)
 {
@@ -160,19 +199,26 @@ static void ps_track_step(uint32_t cx, uint32_t cy, uint32_t fw, uint32_t fh, ui
 
     int64_t err_x = (int64_t)cx - (int64_t)(fw / 2u);
     int64_t err_y = (int64_t)cy - (int64_t)(fh / 2u);
+    int64_t max_correction = (
+        bw >= TRACK_CLOSE_BOX_W || bh >= TRACK_CLOSE_BOX_H
+    ) ? TRACK_MAX_CORRECTION_CLOSE : TRACK_MAX_CORRECTION;
     int64_t pan_correction = 0;
     int64_t tilt_correction = 0;
     if (err_x > TRACK_DEADBAND_X || err_x < -TRACK_DEADBAND_X) {
         pan_correction = clamp_correction_i64(
-            (err_x * TRACK_TICK_PER_PIXEL_NUM) / TRACK_TICK_PER_PIXEL_DEN);
+            (err_x * TRACK_TICK_PER_PIXEL_NUM) / TRACK_TICK_PER_PIXEL_DEN,
+            max_correction);
     }
     if (err_y > TRACK_DEADBAND_Y || err_y < -TRACK_DEADBAND_Y) {
         tilt_correction = clamp_correction_i64(
-            (err_y * TRACK_TICK_PER_PIXEL_NUM) / TRACK_TICK_PER_PIXEL_DEN);
+            (err_y * TRACK_TICK_PER_PIXEL_NUM) / TRACK_TICK_PER_PIXEL_DEN,
+            max_correction);
     }
 
-    *pan_goal = clamp_goal_i64((int64_t)front_pan + pan_correction);
-    *tilt_goal = clamp_goal_i64((int64_t)front_tilt - tilt_correction);
+    *pan_goal = clamp_around_front_i64((int64_t)base_pan + pan_correction,
+                                       front_pan, g_track_pan_limit);
+    *tilt_goal = clamp_around_front_i64((int64_t)base_tilt - tilt_correction,
+                                        front_tilt, g_track_tilt_limit);
 }
 
 static void reg_write(volatile uint32_t *regs, uint32_t offset, uint32_t value)
@@ -624,8 +670,66 @@ static int configure_dxl_pair(int fd, uint32_t pan_id, uint32_t tilt_id,
     return 0;
 }
 
+static uint32_t laser_base_from_distance(uint32_t distance_mm, uint32_t fallback_tick)
+{
+    uint32_t dist = distance_mm ? distance_mm : 3000u;
+    if (dist <= laser_cal_distance_mm[0]) {
+        return laser_cal_tick[0];
+    }
+    if (dist >= laser_cal_distance_mm[LASER_CAL_TABLE_SIZE - 1u]) {
+        return laser_cal_tick[LASER_CAL_TABLE_SIZE - 1u];
+    }
+
+    for (uint32_t i = 0u; i + 1u < LASER_CAL_TABLE_SIZE; i++) {
+        uint32_t d0 = laser_cal_distance_mm[i];
+        uint32_t d1 = laser_cal_distance_mm[i + 1u];
+        if (dist >= d0 && dist <= d1) {
+            int64_t t0 = (int64_t)laser_cal_tick[i];
+            int64_t t1 = (int64_t)laser_cal_tick[i + 1u];
+            int64_t num = ((int64_t)dist - (int64_t)d0) * (t1 - t0);
+            int64_t den = (int64_t)d1 - (int64_t)d0;
+            return clamp_goal_i64(t0 + (den ? (num / den) : 0));
+        }
+    }
+    return clamp_goal_i64(fallback_tick);
+}
+
+static uint32_t laser_goal_from_tilt(uint32_t tilt_goal, uint32_t front_tilt,
+                                     uint32_t laser_center, uint32_t distance_mm,
+                                     int32_t offset_mm, int32_t sign,
+                                     int64_t image_offset_ticks)
+{
+    (void)tilt_goal;
+    (void)front_tilt;
+    (void)offset_mm;
+    (void)sign;
+    uint32_t base_tick = laser_base_from_distance(distance_mm, laser_center);
+    return clamp_goal_i64(
+        (int64_t)base_tick + image_offset_ticks);
+}
+
+static int64_t laser_image_offset_ticks(uint32_t cy, uint32_t frame_h,
+                                        uint32_t vertical_fov_deg)
+{
+    if (frame_h == 0u || vertical_fov_deg == 0u) {
+        return 0;
+    }
+    int64_t err_y = (int64_t)cy - (int64_t)(frame_h / 2u);
+    /*
+     * Image y grows downward. Laser ticks grow upward, so negate err_y.
+     * This points the laser directly at the bbox center before applying
+     * the fixed camera-to-laser height correction.
+     */
+    int64_t num = -err_y * (int64_t)vertical_fov_deg *
+                  (int64_t)LASER_TICKS_PER_DEG_NUM;
+    int64_t den = (int64_t)LASER_TICKS_PER_DEG_DEN * (int64_t)frame_h;
+    return den ? (num / den) : 0;
+}
+
 static int send_goals_usb(int serial_fd, uint32_t pan_id, uint32_t tilt_id,
-                          uint32_t pan_goal, uint32_t tilt_goal, int dry_run)
+                          uint32_t pan_goal, uint32_t tilt_goal,
+                          int laser_enable, uint32_t laser_id, uint32_t laser_goal,
+                          int dry_run)
 {
     if (!dry_run && serial_fd < 0) {
         return -1;
@@ -633,6 +737,13 @@ static int send_goals_usb(int serial_fd, uint32_t pan_id, uint32_t tilt_id,
     if (dxl_sync_write_goal_pair(serial_fd, (uint8_t)pan_id, (uint8_t)tilt_id,
                                  pan_goal, tilt_goal, dry_run) != 0) {
         return -1;
+    }
+    if (laser_enable) {
+        usleep(1000);
+        if (dxl_write4(serial_fd, (uint8_t)laser_id, ADDR_GOAL_POSITION,
+                       laser_goal, dry_run) != 0) {
+            return -1;
+        }
     }
     return 0;
 }
@@ -650,9 +761,18 @@ int main(int argc, char **argv)
     int skip_pl_init = 0;
     int skip_dxl_init = 0;
     int lazy_pl_open = 0;
-    uint32_t profile_accel = 90u;
-    uint32_t profile_velocity = 280u;
-    const char *center_file = "/home/xilinx/ultra_yubin/front_center.env";
+    int track_direct_ps = 0;
+    int track_pl_shadow = 0;
+    uint32_t profile_accel = 60u;
+    uint32_t profile_velocity = 180u;
+    int laser_enable = 1;
+    uint32_t laser_id = 3u;
+    uint32_t laser_center = 2048u;
+    int32_t laser_offset_mm = 38;
+    uint32_t laser_default_distance_mm = LASER_DEFAULT_DISTANCE_MM;
+    uint32_t laser_vertical_fov_deg = LASER_DEFAULT_VERTICAL_FOV_DEG;
+    int32_t laser_sign = -1;
+    const char *center_file = "/home/xilinx/ultra_yubin_v1/front_center.env";
     uint32_t front_pan = PAN_CENTER;
     uint32_t front_tilt = TILT_CENTER;
     uint32_t sw_ctrl = 1u;
@@ -683,10 +803,34 @@ int main(int argc, char **argv)
             skip_dxl_init = 1;
         } else if (!strcmp(argv[i], "--lazy-pl-open")) {
             lazy_pl_open = 1;
+        } else if (!strcmp(argv[i], "--track-direct-ps")) {
+            track_direct_ps = 1;
+        } else if (!strcmp(argv[i], "--track-pl")) {
+            track_direct_ps = 0;
+        } else if (!strcmp(argv[i], "--track-pl-shadow")) {
+            track_pl_shadow = 1;
+        } else if (!strcmp(argv[i], "--track-pan-limit") && i + 1 < argc) {
+            g_track_pan_limit = (int64_t)parse_u32(argv[++i]);
+        } else if (!strcmp(argv[i], "--track-tilt-limit") && i + 1 < argc) {
+            g_track_tilt_limit = (int64_t)parse_u32(argv[++i]);
         } else if (!strcmp(argv[i], "--profile-accel") && i + 1 < argc) {
             profile_accel = parse_u32(argv[++i]);
         } else if (!strcmp(argv[i], "--profile-velocity") && i + 1 < argc) {
             profile_velocity = parse_u32(argv[++i]);
+        } else if (!strcmp(argv[i], "--laser-disable")) {
+            laser_enable = 0;
+        } else if (!strcmp(argv[i], "--laser-id") && i + 1 < argc) {
+            laser_id = parse_u32(argv[++i]);
+        } else if (!strcmp(argv[i], "--laser-center") && i + 1 < argc) {
+            laser_center = parse_u32(argv[++i]);
+        } else if (!strcmp(argv[i], "--laser-offset-mm") && i + 1 < argc) {
+            laser_offset_mm = (int32_t)strtol(argv[++i], NULL, 0);
+        } else if (!strcmp(argv[i], "--laser-distance-mm") && i + 1 < argc) {
+            laser_default_distance_mm = parse_u32(argv[++i]);
+        } else if (!strcmp(argv[i], "--laser-vertical-fov-deg") && i + 1 < argc) {
+            laser_vertical_fov_deg = parse_u32(argv[++i]);
+        } else if (!strcmp(argv[i], "--laser-sign") && i + 1 < argc) {
+            laser_sign = (int32_t)strtol(argv[++i], NULL, 0);
         } else if (!strcmp(argv[i], "--center-file") && i + 1 < argc) {
             center_file = argv[++i];
         } else {
@@ -704,6 +848,14 @@ int main(int argc, char **argv)
     signal(SIGTERM, on_signal);
 
     load_center_file(center_file, &front_pan, &front_tilt);
+    if (!front_center_sane(front_pan, front_tilt)) {
+        fprintf(stderr,
+                "[ultra_yubin_v1] ignoring invalid center file values pan=%u tilt=%u; using defaults %u,%u\n",
+                front_pan, front_tilt, PAN_CENTER, TILT_CENTER);
+        front_pan = PAN_CENTER;
+        front_tilt = TILT_CENTER;
+        (void)save_center_file(center_file, front_pan, front_tilt);
+    }
     sw_pan = front_pan;
     sw_tilt = front_tilt;
 
@@ -727,6 +879,14 @@ int main(int argc, char **argv)
         if (!skip_dxl_init && configure_dxl_pair(serial_fd, pan_id, tilt_id,
                                                  profile_accel, profile_velocity, dry_run) != 0) {
             perror("configure dynamixel");
+            close(serial_fd);
+            close_pl_regs(&mem_fd, &map, &regs);
+            return 1;
+        }
+        if (!skip_dxl_init && laser_enable &&
+            configure_dxl_axis(serial_fd, (uint8_t)laser_id,
+                               profile_accel, profile_velocity, dry_run) != 0) {
+            perror("configure laser dynamixel");
             close(serial_fd);
             close_pl_regs(&mem_fd, &map, &regs);
             return 1;
@@ -771,10 +931,13 @@ int main(int argc, char **argv)
         pl_init_defaults(regs, pan_id, tilt_id, front_pan, front_tilt);
     }
 
-    printf("[ultra_yubin] UDP listen 0.0.0.0:%d, AXI base 0x%08x\n", udp_port, base);
-    printf("[ultra_yubin] serial=%s baud=%d dry_run=%d no_pl=%d skip_pl_init=%d skip_dxl_init=%d lazy_pl_open=%d pan_id=%u tilt_id=%u profile_accel=%u profile_velocity=%u center=(%u,%u) center_file=%s\n",
-           serial_path, baud, dry_run, no_pl, skip_pl_init, skip_dxl_init, lazy_pl_open,
-           pan_id, tilt_id, profile_accel, profile_velocity, front_pan, front_tilt, center_file);
+    printf("[ultra_yubin_v1] UDP listen 0.0.0.0:%d, AXI base 0x%08x\n", udp_port, base);
+    printf("[ultra_yubin_v1] serial=%s baud=%d dry_run=%d no_pl=%d skip_pl_init=%d skip_dxl_init=%d lazy_pl_open=%d track_direct_ps=%d track_pl_shadow=%d track_pan_limit=%lld track_tilt_limit=%lld pan_id=%u tilt_id=%u laser_id=%u laser_center=%u laser_offset_mm=%d laser_distance_mm=%u laser_vertical_fov_deg=%u laser_sign=%d profile_accel=%u profile_velocity=%u center=(%u,%u) center_file=%s\n",
+           serial_path, baud, dry_run, no_pl, skip_pl_init, skip_dxl_init, lazy_pl_open, track_direct_ps, track_pl_shadow,
+           (long long)g_track_pan_limit, (long long)g_track_tilt_limit,
+           pan_id, tilt_id, laser_id, laser_center, laser_offset_mm,
+           laser_default_distance_mm, laser_vertical_fov_deg, laser_sign,
+           profile_accel, profile_velocity, front_pan, front_tilt, center_file);
     fflush(stdout);
 
     while (g_running) {
@@ -789,6 +952,27 @@ int main(int argc, char **argv)
             break;
         }
 
+        for (;;) {
+            char newer[256];
+            struct sockaddr_in newer_peer;
+            socklen_t newer_peer_len = sizeof(newer_peer);
+            ssize_t newer_n = recvfrom(sock, newer, sizeof(newer) - 1,
+                                       MSG_DONTWAIT,
+                                       (struct sockaddr *)&newer_peer,
+                                       &newer_peer_len);
+            if (newer_n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+                    break;
+                }
+                perror("recvfrom drain");
+                break;
+            }
+            memcpy(buf, newer, (size_t)newer_n);
+            n = newer_n;
+            peer = newer_peer;
+            peer_len = newer_peer_len;
+        }
+
         buf[n] = '\0';
         while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r' || buf[n - 1] == ' ')) {
             buf[--n] = '\0';
@@ -796,7 +980,7 @@ int main(int argc, char **argv)
 
         if (!strcmp(buf, "PING")) {
             char reply[160];
-            snprintf(reply, sizeof(reply), "PONG,UDP,ULTRA_YUBIN,base=0x%08x,port=%d,dry=%d,no_pl=%d,lazy=%d,pl_open=%d\n",
+            snprintf(reply, sizeof(reply), "PONG,UDP,ULTRA_YUBIN_V1,base=0x%08x,port=%d,dry=%d,no_pl=%d,lazy=%d,pl_open=%d\n",
                      base, udp_port, dry_run, no_pl, lazy_pl_open, regs != NULL);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
@@ -815,17 +999,24 @@ int main(int argc, char **argv)
             uint32_t pan = raw_pan;
             uint32_t tilt = raw_tilt;
             const char *goal_src = no_pl ? "ps" : "pl";
-            if (!goal_pair_valid(raw_pan, raw_tilt)) {
+            if (!goal_pair_near_front(raw_pan, raw_tilt, front_pan, front_tilt)) {
                 pan = sw_pan;
                 tilt = sw_tilt;
                 goal_src = "ps_shadow";
+                if (!goal_pair_near_front(pan, tilt, front_pan, front_tilt)) {
+                    pan = front_pan;
+                    tilt = front_tilt;
+                    sw_pan = front_pan;
+                    sw_tilt = front_tilt;
+                    goal_src = "front_fallback";
+                }
             } else {
                 sw_pan = raw_pan;
                 sw_tilt = raw_tilt;
             }
             char reply[224];
             snprintf(reply, sizeof(reply),
-                     "PONG,PL,ULTRA_YUBIN,ctrl=0x%08x,count=%u,pan=%u,tilt=%u,raw_pan=%u,raw_tilt=%u,dry=%d,no_pl=%d,src=%s\n",
+                     "PONG,PL,ULTRA_YUBIN_V1,ctrl=0x%08x,count=%u,pan=%u,tilt=%u,raw_pan=%u,raw_tilt=%u,dry=%d,no_pl=%d,src=%s\n",
                      ctrl, count, pan, tilt, raw_pan, raw_tilt, dry_run, no_pl, goal_src);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
@@ -839,7 +1030,7 @@ int main(int argc, char **argv)
                                             profile_accel, profile_velocity, dry_run) == 0;
             } else {
                 usb_ok = dxl_write1(serial_fd, (uint8_t)pan_id, ADDR_TORQUE_ENABLE, 0u, dry_run) == 0;
-                usleep(1000);
+                usleep(200);
                 usb_ok = usb_ok && dxl_write1(serial_fd, (uint8_t)tilt_id, ADDR_TORQUE_ENABLE, 0u, dry_run) == 0;
             }
             char reply[96];
@@ -907,10 +1098,17 @@ int main(int argc, char **argv)
                 pl_cmd_set_goal(regs, front_pan, front_tilt);
                 pl_ctrl_write(regs, 1u);
             }
-            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, front_pan, front_tilt, dry_run) == 0;
-            char reply[128];
-            snprintf(reply, sizeof(reply), "CENTER,1,pan=%u,tilt=%u,usb=%d,dry=%d,no_pl=%d\n",
-                     front_pan, front_tilt, usb_ok, dry_run, no_pl);
+            uint32_t laser_goal = laser_goal_from_tilt(front_tilt, front_tilt,
+                                                       laser_center, laser_default_distance_mm,
+                                                       laser_offset_mm, laser_sign, 0);
+            sw_pan = front_pan;
+            sw_tilt = front_tilt;
+            sw_count++;
+            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, front_pan, front_tilt,
+                                        laser_enable, laser_id, laser_goal, dry_run) == 0;
+            char reply[160];
+            snprintf(reply, sizeof(reply), "CENTER,1,pan=%u,tilt=%u,laser=%u,laser_id=%u,usb=%d,dry=%d,no_pl=%d\n",
+                     front_pan, front_tilt, laser_goal, laser_id, usb_ok, dry_run, no_pl);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
         }
@@ -918,10 +1116,9 @@ int main(int argc, char **argv)
         unsigned int pan = 0;
         unsigned int tilt = 0;
         if (sscanf(buf, "G %u %u", &pan, &tilt) == 2) {
+            pan = clamp_goal_i64(pan);
+            tilt = clamp_goal_i64(tilt);
             if (no_pl) {
-                sw_pan = pan;
-                sw_tilt = tilt;
-                sw_count++;
             } else {
                 if (open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
                     const char *reply = "ERR,pl-open-failed\n";
@@ -931,11 +1128,60 @@ int main(int argc, char **argv)
                 pl_cmd_set_goal(regs, pan, tilt);
                 pl_ctrl_write(regs, 1u);
             }
-            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, pan, tilt, dry_run) == 0;
-            uint32_t count = no_pl ? sw_count : pl_read_count(regs);
+            sw_pan = pan;
+            sw_tilt = tilt;
+            sw_count++;
+            uint32_t laser_goal = laser_goal_from_tilt(tilt, front_tilt,
+                                                       laser_center, laser_default_distance_mm,
+                                                       laser_offset_mm, laser_sign, 0);
+            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, pan, tilt,
+                                        laser_enable, laser_id, laser_goal, dry_run) == 0;
+            uint32_t count = sw_count;
+            char reply[192];
+            snprintf(reply, sizeof(reply), "S,1,pan=%u,tilt=%u,laser=%u,laser_id=%u,usb=%d,count=%u,dry=%d,no_pl=%d\n",
+                     pan, tilt, laser_goal, laser_id, usb_ok, count, dry_run, no_pl);
+            sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
+            continue;
+        }
+
+        unsigned int dxl_id = 0;
+        unsigned int dxl_goal = 0;
+        if (sscanf(buf, "D %u %u", &dxl_id, &dxl_goal) == 2) {
+            dxl_id &= 0xffu;
+            dxl_goal = clamp_goal_i64(dxl_goal);
+            int config_ok = configure_dxl_axis(serial_fd, (uint8_t)dxl_id,
+                                               profile_accel, profile_velocity,
+                                               dry_run) == 0;
+            int usb_ok = config_ok && dxl_write4(serial_fd, (uint8_t)dxl_id,
+                                                 ADDR_GOAL_POSITION, dxl_goal,
+                                                 dry_run) == 0;
             char reply[160];
-            snprintf(reply, sizeof(reply), "S,1,pan=%u,tilt=%u,usb=%d,count=%u,dry=%d,no_pl=%d\n",
-                     pan, tilt, usb_ok, count, dry_run, no_pl);
+            snprintf(reply, sizeof(reply),
+                     "D,1,id=%u,goal=%u,usb=%d,config=%d,dry=%d,no_pl=%d\n",
+                     dxl_id, dxl_goal, usb_ok, config_ok, dry_run, no_pl);
+            sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
+            continue;
+        }
+
+        int dxl_delta = 0;
+        if (sscanf(buf, "DREL %u %d", &dxl_id, &dxl_delta) == 2) {
+            dxl_id &= 0xffu;
+            uint32_t present = 0u;
+            int read_ok = dxl_read4(serial_fd, (uint8_t)dxl_id,
+                                    ADDR_PRESENT_POSITION, &present,
+                                    dry_run) == 0;
+            uint32_t dxl_target = clamp_goal_i64((int64_t)present + (int64_t)dxl_delta);
+            int config_ok = read_ok && configure_dxl_axis(serial_fd, (uint8_t)dxl_id,
+                                                          profile_accel, profile_velocity,
+                                                          dry_run) == 0;
+            int usb_ok = config_ok && dxl_write4(serial_fd, (uint8_t)dxl_id,
+                                                 ADDR_GOAL_POSITION, dxl_target,
+                                                 dry_run) == 0;
+            char reply[192];
+            snprintf(reply, sizeof(reply),
+                     "DREL,1,id=%u,present=%u,delta=%d,goal=%u,usb=%d,read=%d,config=%d,dry=%d,no_pl=%d\n",
+                     dxl_id, present, dxl_delta, dxl_target, usb_ok, read_ok,
+                     config_ok, dry_run, no_pl);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
         }
@@ -969,18 +1215,71 @@ int main(int argc, char **argv)
         }
 
         unsigned int cx = 0, cy = 0, bw = 0, bh = 0, fw = 0, fh = 0, conf = 0, valid = 0;
-        if (sscanf(buf, "T %u %u %u %u %u %u %u %u", &cx, &cy, &bw, &bh, &fw, &fh, &conf, &valid) == 8) {
+        unsigned int distance_mm = laser_default_distance_mm;
+        unsigned int laser_base_override = 0;
+        int track_args = sscanf(buf, "T %u %u %u %u %u %u %u %u %u %u",
+                                &cx, &cy, &bw, &bh, &fw, &fh, &conf, &valid,
+                                &distance_mm, &laser_base_override);
+        if (track_args >= 8) {
             uint32_t pan_now = sw_pan;
             uint32_t tilt_now = sw_tilt;
             uint32_t count = sw_count;
             const char *goal_src = "pl";
-            if (no_pl) {
-                ps_track_step(cx, cy, fw, fh, valid, front_pan, front_tilt, &sw_pan, &sw_tilt);
+            char shadow_extra[192] = "";
+            if (no_pl || track_direct_ps) {
+                uint32_t ps_base_pan = sw_pan;
+                uint32_t ps_base_tilt = sw_tilt;
+                ps_track_step(cx, cy, bw, bh, fw, fh, valid,
+                              sw_pan, sw_tilt, front_pan, front_tilt,
+                              &sw_pan, &sw_tilt);
                 pan_now = sw_pan;
                 tilt_now = sw_tilt;
                 sw_count++;
                 count = sw_count;
-                goal_src = "ps";
+                goal_src = no_pl ? "ps" : "ps_direct";
+                if (track_pl_shadow && !no_pl) {
+                    if (open_pl_regs(base, &mem_fd, &map, &regs) == 0) {
+                        uint32_t shadow_base_pan = ps_base_pan;
+                        uint32_t shadow_base_tilt = ps_base_tilt;
+                        uint32_t shadow_pan = 0u;
+                        uint32_t shadow_tilt = 0u;
+                        uint32_t shadow_count = 0u;
+                        int64_t shadow_diff_pan = 0;
+                        int64_t shadow_diff_tilt = 0;
+
+                        if (!goal_pair_near_front(shadow_base_pan, shadow_base_tilt,
+                                                  front_pan, front_tilt)) {
+                            shadow_base_pan = front_pan;
+                            shadow_base_tilt = front_tilt;
+                        }
+                        clamp_goal_pair_near_front(&shadow_base_pan, &shadow_base_tilt,
+                                                   front_pan, front_tilt);
+                        pl_cmd_set_goal(regs, shadow_base_pan, shadow_base_tilt);
+                        pl_cmd_set_track(regs, cx, cy, bw, bh, fw, fh, conf, valid);
+                        usleep(1000);
+                        shadow_pan = pl_read_pan_goal(regs);
+                        shadow_tilt = pl_read_tilt_goal(regs);
+                        shadow_count = pl_read_count(regs);
+                        if (goal_pair_valid(shadow_pan, shadow_tilt)) {
+                            clamp_goal_pair_near_front(&shadow_pan, &shadow_tilt,
+                                                       front_pan, front_tilt);
+                            shadow_diff_pan = (int64_t)shadow_pan - (int64_t)pan_now;
+                            shadow_diff_tilt = (int64_t)shadow_tilt - (int64_t)tilt_now;
+                            snprintf(shadow_extra, sizeof(shadow_extra),
+                                     ",shadow=ok,pl_pan=%u,pl_tilt=%u,pl_count=%u,pl_diff_pan=%lld,pl_diff_tilt=%lld",
+                                     shadow_pan, shadow_tilt, shadow_count,
+                                     (long long)shadow_diff_pan,
+                                     (long long)shadow_diff_tilt);
+                        } else {
+                            snprintf(shadow_extra, sizeof(shadow_extra),
+                                     ",shadow=bad_pl,pl_pan=%u,pl_tilt=%u",
+                                     shadow_pan, shadow_tilt);
+                        }
+                    } else {
+                        snprintf(shadow_extra, sizeof(shadow_extra),
+                                 ",shadow=pl_open_failed");
+                    }
+                }
             } else {
                 if (open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
                     const char *reply = "ERR,pl-open-failed\n";
@@ -1011,48 +1310,55 @@ int main(int argc, char **argv)
                     sw_pan = pan_now;
                     sw_tilt = tilt_now;
                 } else {
-                    ps_track_step(cx, cy, fw, fh, valid, front_pan, front_tilt, &sw_pan, &sw_tilt);
+                    ps_track_step(cx, cy, bw, bh, fw, fh, valid,
+                                  sw_pan, sw_tilt, front_pan, front_tilt,
+                                  &sw_pan, &sw_tilt);
                     pan_now = sw_pan;
                     tilt_now = sw_tilt;
                     pl_cmd_set_goal(regs, pan_now, tilt_now);
                     goal_src = "ps_fallback";
                 }
             }
-            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, pan_now, tilt_now, dry_run) == 0;
-            char reply[224];
+            int64_t laser_img_ticks =
+                laser_image_offset_ticks(cy, fh, laser_vertical_fov_deg);
+            uint32_t laser_base = laser_base_override ?
+                clamp_goal_i64(laser_base_override) :
+                laser_base_from_distance(distance_mm, laser_center);
+            uint32_t laser_goal = clamp_goal_i64((int64_t)laser_base + laser_img_ticks);
+            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, pan_now, tilt_now,
+                                        laser_enable, laser_id, laser_goal, dry_run) == 0;
+            char reply[512];
             snprintf(reply, sizeof(reply),
-                     "T,1,cx=%u,cy=%u,bw=%u,bh=%u,fw=%u,fh=%u,conf=%u,valid=%u,pan=%u,tilt=%u,usb=%d,count=%u,dry=%d,no_pl=%d,src=%s\n",
-                     cx, cy, bw, bh, fw, fh, conf, valid, pan_now, tilt_now, usb_ok, count, dry_run, no_pl, goal_src);
+                     "T,1,cx=%u,cy=%u,bw=%u,bh=%u,fw=%u,fh=%u,conf=%u,valid=%u,dist=%u,laser_base=%u,pan=%u,tilt=%u,laser=%u,laser_img=%lld,laser_id=%u,usb=%d,count=%u,dry=%d,no_pl=%d,src=%s%s\n",
+                     cx, cy, bw, bh, fw, fh, conf, valid, distance_mm, laser_base,
+                     pan_now, tilt_now, laser_goal, (long long)laser_img_ticks, laser_id,
+                     usb_ok, count, dry_run, no_pl, goal_src, shadow_extra);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
         }
 
         int angle = 0;
         if (sscanf(buf, "A %d %u %u", &angle, &conf, &valid) == 3) {
-            if (!no_pl && open_pl_regs(base, &mem_fd, &map, &regs) != 0) {
-                const char *reply = "ERR,pl-open-failed\n";
-                sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
-                continue;
-            }
             uint32_t pan_now = sw_pan;
-            uint32_t raw_tilt = no_pl ? sw_tilt : pl_read_tilt_goal(regs);
-            uint32_t tilt_now = raw_tilt <= GOAL_MAX && raw_tilt != 0u ? raw_tilt : sw_tilt;
+            uint32_t tilt_now = front_tilt;
             uint32_t count;
             if (valid) {
-                pan_now = clamp_goal_i64((int64_t)PAN_CENTER + ((int64_t)angle * AUDIO_TICKS_PER_DEG));
+                pan_now = clamp_goal_i64((int64_t)front_pan + ((int64_t)angle * AUDIO_TICKS_PER_DEG));
                 sw_pan = pan_now;
                 sw_tilt = tilt_now;
                 sw_count++;
-                if (!no_pl) {
-                    pl_cmd_set_goal(regs, pan_now, tilt_now);
-                }
             }
             count = sw_count;
-            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, pan_now, tilt_now, dry_run) == 0;
-            char reply[160];
+            uint32_t laser_goal = laser_goal_from_tilt(tilt_now, front_tilt,
+                                                       laser_center, laser_default_distance_mm,
+                                                       laser_offset_mm, laser_sign, 0);
+            int usb_ok = send_goals_usb(serial_fd, pan_id, tilt_id, pan_now, tilt_now,
+                                        laser_enable, laser_id, laser_goal, dry_run) == 0;
+            char reply[192];
             snprintf(reply, sizeof(reply),
-                     "A,1,angle=%d,conf=%u,valid=%u,pan=%u,tilt=%u,usb=%d,count=%u,dry=%d,no_pl=%d,ps_audio=1\n",
-                     angle, conf, valid, pan_now, tilt_now, usb_ok, count, dry_run, no_pl);
+                     "A,1,angle=%d,conf=%u,valid=%u,pan=%u,tilt=%u,laser=%u,laser_id=%u,usb=%d,count=%u,dry=%d,no_pl=%d,src=audio_direct,ps_audio=1\n",
+                     angle, conf, valid, pan_now, tilt_now, laser_goal, laser_id,
+                     usb_ok, count, dry_run, no_pl);
             sendto(sock, reply, strlen(reply), 0, (struct sockaddr *)&peer, peer_len);
             continue;
         }

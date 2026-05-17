@@ -46,14 +46,14 @@ module pl_goal_compute_axi #(
 
     localparam [31:0] GOAL_MIN = 32'd0;
     localparam [31:0] GOAL_MAX = 32'd4095;
-    localparam signed [31:0] TRACK_PAN_MIN_LOCK = 32'sd14;
-    localparam signed [31:0] TRACK_PAN_MAX_LOCK = 32'sd56;
-    localparam signed [31:0] TRACK_TILT_MIN_LOCK = 32'sd45;
-    localparam signed [31:0] TRACK_TILT_MAX_LOCK = 32'sd100;
-    localparam signed [31:0] TRACK_PAN_MAX_STEP = 32'sd72;
-    localparam signed [31:0] TRACK_TILT_MAX_STEP = 32'sd40;
-    localparam signed [31:0] TRACK_PAN_ACCEL_STEP = 32'sd48;
-    localparam signed [31:0] TRACK_TILT_ACCEL_STEP = 32'sd20;
+    localparam signed [31:0] TRACK_DEADBAND_X = 32'sd14;
+    localparam signed [31:0] TRACK_DEADBAND_Y = 32'sd14;
+    localparam signed [31:0] TRACK_MAX_CORRECTION_X = 32'sd72;
+    localparam signed [31:0] TRACK_MAX_CORRECTION_Y = 32'sd72;
+    localparam signed [31:0] TRACK_MAX_CORRECTION_CLOSE_X = 32'sd32;
+    localparam signed [31:0] TRACK_MAX_CORRECTION_CLOSE_Y = 32'sd32;
+    localparam [15:0] TRACK_CLOSE_BOX_W = 16'd220;
+    localparam [15:0] TRACK_CLOSE_BOX_H = 16'd160;
     localparam [3:0] CMD_LEGACY  = 4'h0;
     localparam [3:0] CMD_SET_PAN = 4'h1;
     localparam [3:0] CMD_SET_TILT = 4'h2;
@@ -81,8 +81,6 @@ module pl_goal_compute_axi #(
     reg [31:0] compute_count;
     reg [31:0] last_pan;
     reg [31:0] last_tilt;
-    reg signed [31:0] last_track_pan_step;
-    reg signed [31:0] last_track_tilt_step;
 
     reg [15:0] track_cx;
     reg [15:0] track_cy;
@@ -99,29 +97,21 @@ module pl_goal_compute_axi #(
 
     wire signed [31:0] track_error_x;
     wire signed [31:0] track_error_y;
-    wire signed [31:0] track_pan_raw_step;
-    wire signed [31:0] track_tilt_raw_step;
-    wire signed [31:0] track_pan_target_step;
-    wire signed [31:0] track_tilt_target_step;
     wire signed [31:0] track_pan_step;
     wire signed [31:0] track_tilt_step;
+    wire signed [31:0] track_max_correction_x;
+    wire signed [31:0] track_max_correction_y;
 
     assign track_error_x = $signed({16'h0, track_cx}) - $signed({16'h0, (track_fw >> 1)});
     assign track_error_y = $signed({16'h0, track_cy}) - $signed({16'h0, (track_fh >> 1)});
-    assign track_pan_raw_step = shape_step_axis(
-        track_error_x,
-        box_lock(track_bw, 1'b0),
-        32'sd12, 32'sd18, 32'sd28, 32'sd40, 32'sd56, 32'sd72, 32'sd72
-    );
-    assign track_tilt_raw_step = -shape_step_axis(
-        track_error_y,
-        box_lock(track_bh, 1'b1),
-        32'sd6, 32'sd10, 32'sd14, 32'sd20, 32'sd28, 32'sd36, 32'sd40
-    );
-    assign track_pan_target_step = scale_limit_step(track_pan_raw_step, track_bw, TRACK_PAN_MAX_STEP);
-    assign track_tilt_target_step = scale_limit_step(track_tilt_raw_step, track_bh, TRACK_TILT_MAX_STEP);
-    assign track_pan_step = accel_limit_step(track_pan_target_step, last_track_pan_step, TRACK_PAN_ACCEL_STEP);
-    assign track_tilt_step = accel_limit_step(track_tilt_target_step, last_track_tilt_step, TRACK_TILT_ACCEL_STEP);
+    assign track_max_correction_x =
+        (track_bw >= TRACK_CLOSE_BOX_W || track_bh >= TRACK_CLOSE_BOX_H) ?
+        TRACK_MAX_CORRECTION_CLOSE_X : TRACK_MAX_CORRECTION_X;
+    assign track_max_correction_y =
+        (track_bw >= TRACK_CLOSE_BOX_W || track_bh >= TRACK_CLOSE_BOX_H) ?
+        TRACK_MAX_CORRECTION_CLOSE_Y : TRACK_MAX_CORRECTION_Y;
+    assign track_pan_step = ps_direct_step(track_error_x, TRACK_DEADBAND_X, track_max_correction_x);
+    assign track_tilt_step = -ps_direct_step(track_error_y, TRACK_DEADBAND_Y, track_max_correction_y);
 
     function [31:0] apply_wstrb;
         input [31:0] old_data;
@@ -158,67 +148,6 @@ module pl_goal_compute_axi #(
         end
     endfunction
 
-    function signed [31:0] box_lock;
-        input [15:0] box_dim;
-        input is_tilt;
-        reg signed [31:0] candidate;
-        reg signed [31:0] min_lock;
-        reg signed [31:0] max_lock;
-        begin
-            min_lock = is_tilt ? TRACK_TILT_MIN_LOCK : TRACK_PAN_MIN_LOCK;
-            max_lock = is_tilt ? TRACK_TILT_MAX_LOCK : TRACK_PAN_MAX_LOCK;
-            candidate = is_tilt ? $signed({16'h0, box_dim}) : ($signed({16'h0, box_dim}) >>> 1);
-            if (candidate < min_lock) begin
-                box_lock = min_lock;
-            end else if (candidate > max_lock) begin
-                box_lock = max_lock;
-            end else begin
-                box_lock = candidate;
-            end
-        end
-    endfunction
-
-    function signed [31:0] shape_step_axis;
-        input signed [31:0] err;
-        input signed [31:0] lock_radius;
-        input signed [31:0] step0;
-        input signed [31:0] step1;
-        input signed [31:0] step2;
-        input signed [31:0] step3;
-        input signed [31:0] step4;
-        input signed [31:0] step5;
-        input signed [31:0] step6;
-        reg signed [31:0] abs_err;
-        reg signed [31:0] active_err;
-        reg signed [31:0] mag;
-        begin
-            abs_err = abs32(err);
-            if (abs_err <= lock_radius) begin
-                shape_step_axis = 32'sd0;
-            end else begin
-                active_err = abs_err - lock_radius;
-                if (active_err <= 32'sd24) begin
-                    mag = step0;
-                end else if (active_err <= 32'sd48) begin
-                    mag = step1;
-                end else if (active_err <= 32'sd72) begin
-                    mag = step2;
-                end else if (active_err <= 32'sd96) begin
-                    mag = step3;
-                end else if (active_err <= 32'sd128) begin
-                    mag = step4;
-                end else if (active_err <= 32'sd160) begin
-                    mag = step5;
-                end else if (active_err <= 32'sd200) begin
-                    mag = step6;
-                end else begin
-                    mag = step6;
-                end
-                shape_step_axis = err > 0 ? mag : -mag;
-            end
-        end
-    endfunction
-
     function signed [31:0] clamp_signed_mag;
         input signed [31:0] value;
         input signed [31:0] max_mag;
@@ -233,44 +162,26 @@ module pl_goal_compute_axi #(
         end
     endfunction
 
-    function signed [31:0] scale_limit_step;
-        input signed [31:0] step;
-        input [15:0] box_dim;
-        input signed [31:0] axis_max;
-        reg signed [31:0] cap;
+    function signed [31:0] div8_trunc_zero;
+        input signed [31:0] value;
         begin
-            if (box_dim >= 16'd170) begin
-                cap = axis_max >>> 1;
-            end else if (box_dim >= 16'd120) begin
-                cap = axis_max - (axis_max >>> 2);
+            if (value < 32'sd0) begin
+                div8_trunc_zero = -((-value) >>> 3);
             end else begin
-                cap = axis_max;
+                div8_trunc_zero = value >>> 3;
             end
-            scale_limit_step = clamp_signed_mag(step, cap);
         end
     endfunction
 
-    function signed [31:0] accel_limit_step;
-        input signed [31:0] desired;
-        input signed [31:0] previous;
-        input signed [31:0] max_delta;
-        reg signed [31:0] delta;
+    function signed [31:0] ps_direct_step;
+        input signed [31:0] err;
+        input signed [31:0] deadband;
+        input signed [31:0] max_correction;
         begin
-            if (desired == 32'sd0) begin
-                accel_limit_step = 32'sd0;
-            end else if (previous == 32'sd0 ||
-                         (desired > 32'sd0 && previous < 32'sd0) ||
-                         (desired < 32'sd0 && previous > 32'sd0)) begin
-                accel_limit_step = clamp_signed_mag(desired, max_delta);
+            if (abs32(err) <= deadband) begin
+                ps_direct_step = 32'sd0;
             end else begin
-                delta = desired - previous;
-                if (delta > max_delta) begin
-                    accel_limit_step = previous + max_delta;
-                end else if (delta < -max_delta) begin
-                    accel_limit_step = previous - max_delta;
-                end else begin
-                    accel_limit_step = desired;
-                end
+                ps_direct_step = clamp_signed_mag(div8_trunc_zero(err), max_correction);
             end
         end
     endfunction
@@ -306,8 +217,6 @@ module pl_goal_compute_axi #(
         compute_count = 32'h0;
         last_pan = 32'd2048;
         last_tilt = 32'd2772;
-        last_track_pan_step = 32'sd0;
-        last_track_tilt_step = 32'sd0;
         track_cx = 16'd640;
         track_cy = 16'd360;
         track_bw = 16'd80;
@@ -395,8 +304,6 @@ module pl_goal_compute_axi #(
             compute_count <= 32'h0;
             last_pan <= 32'd2048;
             last_tilt <= 32'd2772;
-            last_track_pan_step <= 32'sd0;
-            last_track_tilt_step <= 32'sd0;
             track_cx <= 16'd640;
             track_cy <= 16'd360;
             track_bw <= 16'd80;
@@ -412,19 +319,15 @@ module pl_goal_compute_axi #(
                             if (write_data_q[0]) begin
                                 last_pan <= pan_goal;
                                 last_tilt <= tilt_goal;
-                                last_track_pan_step <= 32'sd0;
-                                last_track_tilt_step <= 32'sd0;
                                 compute_count <= compute_count + 1'b1;
                                 done_toggle <= ~done_toggle;
                             end
                         end
                         CMD_SET_PAN: begin
                             pan_goal <= {20'h0, write_data_q[11:0]};
-                            last_track_pan_step <= 32'sd0;
                         end
                         CMD_SET_TILT: begin
                             tilt_goal <= {20'h0, write_data_q[11:0]};
-                            last_track_tilt_step <= 32'sd0;
                         end
                         CMD_SET_CX: begin
                             track_cx <= write_data_q[15:0];
@@ -449,8 +352,6 @@ module pl_goal_compute_axi #(
                                 tilt_goal <= clamp_goal($signed({32'h0, tilt_goal}) + $signed(track_tilt_step));
                                 last_pan <= clamp_goal($signed({32'h0, pan_goal}) + $signed(track_pan_step));
                                 last_tilt <= clamp_goal($signed({32'h0, tilt_goal}) + $signed(track_tilt_step));
-                                last_track_pan_step <= track_pan_step;
-                                last_track_tilt_step <= track_tilt_step;
                                 compute_count <= compute_count + 1'b1;
                                 done_toggle <= ~done_toggle;
                                 track_toggle <= ~track_toggle;
@@ -462,11 +363,9 @@ module pl_goal_compute_axi #(
                 end
                 ADDR_PAN_GOAL: begin
                     pan_goal <= write_data_q;
-                    last_track_pan_step <= 32'sd0;
                 end
                 ADDR_TILT_GOAL: begin
                     tilt_goal <= write_data_q;
-                    last_track_tilt_step <= 32'sd0;
                 end
                 ADDR_IDS: begin
                     pan_id <= write_data_q[7:0];
@@ -491,8 +390,6 @@ module pl_goal_compute_axi #(
                         tilt_goal <= clamp_goal($signed({32'h0, tilt_goal}) + $signed(track_tilt_step));
                         last_pan <= clamp_goal($signed({32'h0, pan_goal}) + $signed(track_pan_step));
                         last_tilt <= clamp_goal($signed({32'h0, tilt_goal}) + $signed(track_tilt_step));
-                        last_track_pan_step <= track_pan_step;
-                        last_track_tilt_step <= track_tilt_step;
                         compute_count <= compute_count + 1'b1;
                         done_toggle <= ~done_toggle;
                         track_toggle <= ~track_toggle;

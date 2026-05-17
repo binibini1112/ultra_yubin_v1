@@ -1,5 +1,6 @@
 import os
 import socket
+import threading
 import time
 
 
@@ -21,27 +22,28 @@ class UltraYubinMotorController:
     """
 
     def __init__(self):
-        self.host = os.getenv("ULTRA_YUBIN_HOST", "192.168.3.1")
-        self.port = int(os.getenv("ULTRA_YUBIN_PORT", "5016"))
-        self.timeout = float(os.getenv("ULTRA_YUBIN_TIMEOUT_SEC", "0.08"))
-        self.default_conf = int(os.getenv("ULTRA_YUBIN_DEFAULT_CONF", "1000"))
-        self.default_bbox_w = int(os.getenv("ULTRA_YUBIN_DEFAULT_BBOX_W", "0"))
-        self.default_bbox_h = int(os.getenv("ULTRA_YUBIN_DEFAULT_BBOX_H", "0"))
-        self.control_period_sec = float(os.getenv("ULTRA_YUBIN_CONTROL_PERIOD_SEC", "0.02"))
-        self.deadband_px = int(os.getenv("ULTRA_YUBIN_DEADBAND_PX", "5"))
-        self.deadband_x_px = int(os.getenv("ULTRA_YUBIN_DEADBAND_X_PX", str(self.deadband_px)))
-        self.deadband_y_px = int(os.getenv("ULTRA_YUBIN_DEADBAND_Y_PX", str(self.deadband_px)))
-        self.smooth_alpha = float(os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA", "1.0"))
-        self.smooth_alpha_x = float(os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA_X", str(self.smooth_alpha)))
-        self.smooth_alpha_y = float(os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA_Y", str(self.smooth_alpha)))
-        self.aim_offset_x = int(os.getenv("ULTRA_YUBIN_AIM_OFFSET_X", "0"))
-        self.aim_offset_y = int(os.getenv("ULTRA_YUBIN_AIM_OFFSET_Y", "0"))
-        self.invert_x_to_pl = os.getenv("ULTRA_YUBIN_INVERT_X_TO_PL", "0") == "1"
-        self.invert_y_to_pl = os.getenv("ULTRA_YUBIN_INVERT_Y_TO_PL", "1") == "1"
-        self.center_on_start = os.getenv("ULTRA_YUBIN_CENTER_ON_START", "1") == "1"
-        self.async_send = os.getenv("ULTRA_YUBIN_ASYNC_SEND", "0") == "1"
+        self.host = os.getenv("ULTRA_CHAN_HOST", os.getenv("ULTRA_YUBIN_HOST", "192.168.3.1"))
+        self.port = int(os.getenv("ULTRA_CHAN_PORT", os.getenv("ULTRA_YUBIN_PORT", "5016")))
+        self.timeout = float(os.getenv("ULTRA_CHAN_TIMEOUT_SEC", os.getenv("ULTRA_YUBIN_TIMEOUT_SEC", "0.08")))
+        self.default_conf = int(os.getenv("ULTRA_CHAN_DEFAULT_CONF", os.getenv("ULTRA_YUBIN_DEFAULT_CONF", str(_get_config_value("ULTRA_CHAN_DEFAULT_CONF", 1000)))))
+        self.default_bbox_w = int(os.getenv("ULTRA_CHAN_DEFAULT_BBOX_W", os.getenv("ULTRA_YUBIN_DEFAULT_BBOX_W", str(_get_config_value("ULTRA_CHAN_DEFAULT_BBOX_W", 0)))))
+        self.default_bbox_h = int(os.getenv("ULTRA_CHAN_DEFAULT_BBOX_H", os.getenv("ULTRA_YUBIN_DEFAULT_BBOX_H", str(_get_config_value("ULTRA_CHAN_DEFAULT_BBOX_H", 0)))))
+        self.control_period_sec = float(os.getenv("ULTRA_CHAN_CONTROL_PERIOD_SEC", os.getenv("ULTRA_YUBIN_CONTROL_PERIOD_SEC", str(_get_config_value("ULTRA_CHAN_CONTROL_PERIOD_SEC", 0.025)))))
+        self.deadband_px = int(os.getenv("ULTRA_CHAN_DEADBAND_PX", os.getenv("ULTRA_YUBIN_DEADBAND_PX", str(_get_config_value("ULTRA_CHAN_DEADBAND_PX", 16)))))
+        self.deadband_x_px = int(os.getenv("ULTRA_CHAN_DEADBAND_X_PX", os.getenv("ULTRA_YUBIN_DEADBAND_X_PX", str(self.deadband_px))))
+        self.deadband_y_px = int(os.getenv("ULTRA_CHAN_DEADBAND_Y_PX", os.getenv("ULTRA_YUBIN_DEADBAND_Y_PX", str(self.deadband_px))))
+        self.smooth_alpha = float(os.getenv("ULTRA_CHAN_SMOOTH_ALPHA", os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA", str(_get_config_value("ULTRA_CHAN_SMOOTH_ALPHA", 0.38)))))
+        self.smooth_alpha_x = float(os.getenv("ULTRA_CHAN_SMOOTH_ALPHA_X", os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA_X", str(self.smooth_alpha))))
+        self.smooth_alpha_y = float(os.getenv("ULTRA_CHAN_SMOOTH_ALPHA_Y", os.getenv("ULTRA_YUBIN_SMOOTH_ALPHA_Y", str(self.smooth_alpha))))
+        self.aim_offset_x = int(os.getenv("ULTRA_CHAN_AIM_OFFSET_X", os.getenv("ULTRA_YUBIN_AIM_OFFSET_X", "0")))
+        self.aim_offset_y = int(os.getenv("ULTRA_CHAN_AIM_OFFSET_Y", os.getenv("ULTRA_YUBIN_AIM_OFFSET_Y", "0")))
+        self.invert_x_to_pl = os.getenv("ULTRA_CHAN_INVERT_X_TO_PL", os.getenv("ULTRA_YUBIN_INVERT_X_TO_PL", "1")) == "1"
+        self.invert_y_to_pl = os.getenv("ULTRA_CHAN_INVERT_Y_TO_PL", os.getenv("ULTRA_YUBIN_INVERT_Y_TO_PL", "1")) == "1"
+        self.center_on_start = os.getenv("ULTRA_CHAN_CENTER_ON_START", os.getenv("ULTRA_YUBIN_CENTER_ON_START", "1")) == "1"
+        self.async_send = os.getenv("ULTRA_CHAN_ASYNC_SEND", os.getenv("ULTRA_YUBIN_ASYNC_SEND", "1" if _get_config_value("ULTRA_CHAN_ASYNC_SEND", True) else "0")) == "1"
+        self.laser_id = int(os.getenv("ULTRA_CHAN_LASER_ID", os.getenv("ULTRA_YUBIN_LASER_ID", str(_get_config_value("ULTRA_CHAN_LASER_ID", 3)))))
         self.cur_pan = int(_get_config_value("PAN_CENTER", 2048))
-        self.cur_tilt = int(os.getenv("ULTRA_YUBIN_CENTER_TILT", "2772"))
+        self.cur_tilt = int(os.getenv("ULTRA_CHAN_CENTER_TILT", os.getenv("ULTRA_YUBIN_CENTER_TILT", "2772")))
         self.pan_min = int(_get_config_value("PAN_MIN", 0))
         self.pan_max = int(_get_config_value("PAN_MAX", 4095))
         self.tilt_min = int(_get_config_value("TILT_MIN", 2340))
@@ -49,6 +51,7 @@ class UltraYubinMotorController:
         self.pan_dir = int(_get_config_value("PAN_DIR", 1))
         self.tilt_dir = int(_get_config_value("TILT_DIR", 1))
         self.ready = False
+        self._command_lock = threading.Lock()
         self._last_control_sent = 0.0
         self._smooth_cx = None
         self._smooth_cy = None
@@ -77,18 +80,23 @@ class UltraYubinMotorController:
             "motor_ms": 0.0,
             "target_active": 0,
             "async_send": int(self.async_send),
+            "distance_mm": None,
+            "laser": None,
+            "laser_base_tick": None,
         }
 
     def _request(self, cmd):
-        started = time.perf_counter()
-        self._sock.sendto((cmd.rstrip() + "\n").encode("ascii"), (self.host, self.port))
-        data, _ = self._sock.recvfrom(512)
-        elapsed_ms = (time.perf_counter() - started) * 1000.0
+        with self._command_lock:
+            started = time.perf_counter()
+            self._sock.sendto((cmd.rstrip() + "\n").encode("ascii"), (self.host, self.port))
+            data, _ = self._sock.recvfrom(512)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
         return data.decode("ascii", errors="replace").strip(), elapsed_ms
 
     def _send_async(self, cmd):
-        started = time.perf_counter()
-        self._tx_sock.sendto((cmd.rstrip() + "\n").encode("ascii"), (self.host, self.port))
+        with self._command_lock:
+            started = time.perf_counter()
+            self._tx_sock.sendto((cmd.rstrip() + "\n").encode("ascii"), (self.host, self.port))
         return (time.perf_counter() - started) * 1000.0
 
     def _parse_reply(self, reply):
@@ -112,16 +120,19 @@ class UltraYubinMotorController:
         send_cy=0,
         aim_cx=0,
         aim_cy=0,
+        distance_mm=None,
     ):
         parsed = self._parse_reply(reply)
         pan = int(parsed.get("pan", self.cur_pan))
         tilt = int(parsed.get("tilt", self.cur_tilt))
+        laser = int(parsed.get("laser", "-1")) if parsed.get("laser", "-1").lstrip("-").isdigit() else None
+        laser_base = int(parsed.get("laser_base", "-1")) if parsed.get("laser_base", "-1").lstrip("-").isdigit() else None
         self.cur_pan = pan
         self.cur_tilt = tilt
         reply_kind = reply.split(",", 1)[0] if reply else ""
         src = parsed.get("src", "")
         if parsed.get("ps_audio", "0") == "1":
-            src = "audio"
+            src = parsed.get("src", "audio_direct")
         self.last_telemetry.update({
             "ready": True,
             "mode": "ultra_yubin",
@@ -148,6 +159,9 @@ class UltraYubinMotorController:
             "motor_ms": float(elapsed_ms),
             "target_active": int(active),
             "async_send": int(self.async_send),
+            "distance_mm": distance_mm,
+            "laser": laser,
+            "laser_base_tick": laser_base,
             "src": src,
             "ctrl": parsed.get("ctrl", ""),
             "dry": parsed.get("dry", ""),
@@ -157,11 +171,45 @@ class UltraYubinMotorController:
         })
         return dict(self.last_telemetry)
 
+    def set_laser_tick(self, tick):
+        tick = max(0, min(4095, int(tick)))
+        try:
+            reply, elapsed_ms = self._request(f"D {self.laser_id} {tick}")
+            parsed = self._parse_reply(reply)
+            ok = parsed.get("usb", "0") == "1"
+            goal = int(parsed.get("goal", tick)) if ok else tick
+            self.last_telemetry.update({
+                "ready": True,
+                "tx_cmd": f"D {self.laser_id} {tick}",
+                "rx_reply": reply,
+                "reply_kind": reply.split(",", 1)[0] if reply else "",
+                "fpga_reply": reply,
+                "motor_ms": float(elapsed_ms),
+                "usb_ok": int(ok),
+                "laser": goal,
+                "laser_base_tick": goal,
+            })
+            return ok, goal, reply
+        except Exception as exc:
+            reply = f"ERR,{exc}"
+            self.last_telemetry.update({
+                "ready": self.ready,
+                "tx_cmd": f"D {self.laser_id} {tick}",
+                "rx_reply": reply,
+                "reply_kind": "ERR",
+                "fpga_reply": reply,
+                "usb_ok": 0,
+            })
+            return False, tick, reply
+
     def start(self):
         try:
             tx_cmd = "PLPING"
             reply, elapsed_ms = self._request(tx_cmd)
-            if not reply.startswith("PONG,PL,ULTRA_YUBIN"):
+            if not (
+                reply.startswith("PONG,PL,ULTRA_YUBIN")
+                or reply.startswith("PONG,PL,ULTRA_CHAN")
+            ):
                 print(f"[ultra_yubin] unexpected PLPING reply: {reply}")
                 return self
             self.ready = True
@@ -184,6 +232,8 @@ class UltraYubinMotorController:
         img_height=720,
         bbox_width=None,
         bbox_height=None,
+        distance_mm=None,
+        laser_base_tick=None,
         aim_center_x=None,
         aim_center_y=None,
     ):
@@ -219,6 +269,8 @@ class UltraYubinMotorController:
                 "motor_ms": 0.0,
                 "target_active": 1,
                 "usb_ok": 0,
+                "distance_mm": distance_mm,
+                "laser_base_tick": laser_base_tick,
             })
             return dict(self.last_telemetry)
 
@@ -239,6 +291,8 @@ class UltraYubinMotorController:
                 "motor_ms": 0.0,
                 "target_active": 1,
                 "usb_ok": 0,
+                "distance_mm": distance_mm,
+                "laser_base_tick": laser_base_tick,
             })
             return dict(self.last_telemetry)
 
@@ -262,9 +316,11 @@ class UltraYubinMotorController:
             control_cy = img_height - control_cy
         control_cx = max(0, min(img_width, control_cx))
         control_cy = max(0, min(img_height, control_cy))
+        dist_arg = 0 if distance_mm is None else max(0, int(distance_mm))
+        laser_arg = 0 if laser_base_tick is None else max(0, min(4095, int(laser_base_tick)))
         cmd = (
             f"T {control_cx} {control_cy} {bbox_width} {bbox_height} "
-            f"{img_width} {img_height} {self.default_conf} 1"
+            f"{img_width} {img_height} {self.default_conf} 1 {dist_arg} {laser_arg}"
         )
         try:
             if self.async_send:
@@ -294,6 +350,8 @@ class UltraYubinMotorController:
                     "target_active": 1,
                     "src": "pl",
                     "async_send": 1,
+                    "distance_mm": distance_mm,
+                    "laser_base_tick": laser_base_tick,
                 })
                 return dict(self.last_telemetry)
             reply, elapsed_ms = self._request(cmd)
@@ -309,6 +367,7 @@ class UltraYubinMotorController:
                 send_cy=control_cy,
                 aim_cx=aim_cx,
                 aim_cy=aim_cy,
+                distance_mm=distance_mm,
             )
         except Exception as exc:
             self.ready = False

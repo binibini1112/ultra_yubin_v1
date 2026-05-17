@@ -1,9 +1,9 @@
 param(
     [string]$JetsonHost = "192.168.0.9",
     [string]$JetsonUser = "jetson",
-    [string]$JetsonRoot = "/home/jetson/ultra_yubin",
-    [string]$ProjectRoot = "C:\Users\hansung\examples\ultra_yubin",
-    [string]$ProjectName = "ultra_yubin",
+    [string]$JetsonRoot = "/home/jetson/ultra_yubin_v1",
+    [string]$ProjectRoot = "C:\Users\hansung\examples\ultra_yubin_v1",
+    [string]$ProjectName = "ultra_yubin_v1",
     [string]$VivadoSettings = "C:\Xilinx\Vivado\2023.1\settings64.bat",
     [bool]$Clean = $true
 )
@@ -31,7 +31,7 @@ $BuildTcl = Join-Path $LocalTools "vivado_build_ultra_yubin.tcl"
 $Rtl = Join-Path $ProjectRoot "rtl\pl_goal_compute_axi.v"
 $Tb = Join-Path $ProjectRoot "tb\pl_goal_compute_axi_tb.v"
 $Bit = Join-Path $ProjectRoot "$ProjectName.runs\impl_1\design_1_wrapper.bit"
-$Log = Join-Path $LocalTools "vivado_ultra_yubin_$Stamp.log"
+$Log = Join-Path $LocalTools "vivado_ultra_yubin_v1_$Stamp.log"
 $JetsonTarget = "${JetsonUser}@${JetsonHost}"
 
 New-Item -ItemType Directory -Force -Path $ProjectRoot | Out-Null
@@ -72,7 +72,7 @@ Write-Host "===== RUN VIVADO BUILD ====="
 $VivadoCmd = "call `"$VivadoSettings`" && vivado -mode batch -source `"$BuildTcl`" -tclargs `"$ProjectRoot`" `"$ProjectName`" `"$Rtl`" `"$Tb`""
 cmd.exe /c "$VivadoCmd" 2>&1 | Tee-Object -FilePath $Log
 if ($LASTEXITCODE -ne 0) {
-    Invoke-External "scp" @("$Log", "$($JetsonTarget):${JetsonRoot}/benchmark_logs/vivado_ultra_yubin_$Stamp.log") 2
+    Invoke-External "scp" @("$Log", "$($JetsonTarget):${JetsonRoot}/benchmark_logs/vivado_ultra_yubin_v1_$Stamp.log") 2
     Die "Vivado build failed. Log: $Log"
 }
 
@@ -83,12 +83,12 @@ $Hwh = Get-ChildItem $ProjectRoot -Recurse -Filter design_1.hwh |
     Select-Object -First 1
 
 Write-Host "===== SEND ARTIFACTS TO JETSON ====="
-Invoke-External "scp" @("$Bit", "$($JetsonTarget):${JetsonRoot}/bitstream/ultra_yubin.bit") 3
+Invoke-External "scp" @("$Bit", "$($JetsonTarget):${JetsonRoot}/bitstream/ultra_yubin_v1.bit") 3
 if ($null -ne $Hwh) {
-    Invoke-External "scp" @("$($Hwh.FullName)", "$($JetsonTarget):${JetsonRoot}/bitstream/ultra_yubin.hwh") 3
+    Invoke-External "scp" @("$($Hwh.FullName)", "$($JetsonTarget):${JetsonRoot}/bitstream/ultra_yubin_v1.hwh") 3
 }
-Invoke-External "scp" @("$Log", "$($JetsonTarget):${JetsonRoot}/benchmark_logs/vivado_ultra_yubin_$Stamp.log") 3
-Invoke-External "ssh" @($JetsonTarget, "ls -lh ${JetsonRoot}/bitstream/ultra_yubin.bit ${JetsonRoot}/bitstream/ultra_yubin.hwh 2>/dev/null || true; test -s ${JetsonRoot}/bitstream/ultra_yubin.bit") 2
+Invoke-External "scp" @("$Log", "$($JetsonTarget):${JetsonRoot}/benchmark_logs/vivado_ultra_yubin_v1_$Stamp.log") 3
+Invoke-External "ssh" @($JetsonTarget, "ls -lh ${JetsonRoot}/bitstream/ultra_yubin_v1.bit ${JetsonRoot}/bitstream/ultra_yubin_v1.hwh 2>/dev/null || true; test -s ${JetsonRoot}/bitstream/ultra_yubin_v1.bit") 2
 
 Write-Host "===== DONE ====="
 Write-Host "Next on Jetson:"

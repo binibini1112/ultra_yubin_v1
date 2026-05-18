@@ -23,6 +23,7 @@ if JETSON_SRC not in sys.path:
 
 import src.config as config
 from src.control.camera import CameraStream
+from src.control.ultra_yubin_motor import UltraYubinMotorController
 from src.vision.vision_tracker import VisionDetector
 
 
@@ -95,7 +96,26 @@ def best_detection(result):
     return best
 
 
-def draw(frame, args, det, recent, saved_count, last_saved):
+def drive_motor(motor, det, frame_shape, args):
+    if motor is None or not det or det["conf"] < args.conf:
+        return None
+    frame_h, frame_w = frame_shape[:2]
+    x1, y1, x2, y2 = det["box"]
+    cx = int(round((x1 + x2) / 2.0))
+    cy = int(round((y1 + y2) / 2.0))
+    distance_mm = int(round(float(args.distance_m) * 1000.0))
+    return motor.control(
+        cx,
+        cy,
+        frame_w,
+        frame_h,
+        bbox_width=det["bbox_w"],
+        bbox_height=det["bbox_h"],
+        distance_mm=distance_mm,
+    )
+
+
+def draw(frame, args, det, recent, saved_count, last_saved, motor_status=None):
     h, w = frame.shape[:2]
     cx, cy = w // 2, h // 2
     green = (80, 230, 90)
@@ -130,6 +150,13 @@ def draw(frame, args, det, recent, saved_count, last_saved):
         avg_conf = float(np.mean([r["conf"] for r in recent]))
         cv2.putText(frame, f"avg h={avg_h:.1f} w={avg_w:.1f} conf={avg_conf:.2f} saved={saved_count}",
                     (14, h - 42), cv2.FONT_HERSHEY_SIMPLEX, 0.52, white, 1, cv2.LINE_AA)
+    if motor_status:
+        reply = str(motor_status.get("reply_kind", motor_status.get("fpga_reply", "")))
+        pan = motor_status.get("pan", "-")
+        tilt = motor_status.get("tilt", "-")
+        src = motor_status.get("src", "")
+        cv2.putText(frame, f"drive={reply} src={src} pan={pan} tilt={tilt}",
+                    (w - 430, h - 16), cv2.FONT_HERSHEY_SIMPLEX, 0.42, amber, 1, cv2.LINE_AA)
     if last_saved:
         cv2.putText(frame, f"saved: {last_saved}",
                     (14, h - 16), cv2.FONT_HERSHEY_SIMPLEX, 0.42, muted, 1, cv2.LINE_AA)
@@ -145,6 +172,8 @@ def main():
     parser.add_argument("--window", type=int, default=30)
     parser.add_argument("--conf", type=float, default=float(os.getenv("YOLO_CONF", "0.60")))
     parser.add_argument("--imgsz", type=int, default=int(os.getenv("YOLO_IMGSZ", "640")))
+    parser.add_argument("--drive", action="store_true", help="drive Ultra96 PL pan/tilt while collecting bbox samples")
+    parser.add_argument("--drive-echo-every", type=int, default=30)
     args = parser.parse_args()
 
     os.environ["YOLO_CONF"] = str(args.conf)
@@ -155,12 +184,15 @@ def main():
 
     cam = CameraStream(args.camera).start()
     detector = VisionDetector(args.model)
+    motor = UltraYubinMotorController().start() if args.drive else None
     recent = deque(maxlen=max(1, int(args.window)))
     saved_count = 0
     last_saved = ""
+    last_motor_status = None
+    frame_idx = 0
     window_name = "ULTRA YUBIN V1 BBOX DIST CAL"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-    print(f"[bbox-cal] distance={args.distance_m:.2f}m output={args.output}")
+    print(f"[bbox-cal] distance={args.distance_m:.2f}m output={args.output} drive={int(args.drive)}")
     print("[bbox-cal] Put drone at this distance. SPACE save | c clear | q quit")
 
     try:
@@ -169,11 +201,25 @@ def main():
             if frame is None:
                 time.sleep(0.01)
                 continue
+            frame_idx += 1
             result = detector.track(frame, persist=False)
             det = best_detection(result)
             if det and det["conf"] >= args.conf:
                 recent.append(det)
-            draw(frame, args, det, recent, saved_count, last_saved)
+                last_motor_status = drive_motor(motor, det, frame.shape, args)
+                if (
+                    last_motor_status
+                    and args.drive_echo_every > 0
+                    and frame_idx % args.drive_echo_every == 0
+                ):
+                    print(
+                        "[bbox-cal-drive] "
+                        f"f={frame_idx} cx={(det['box'][0] + det['box'][2]) // 2} "
+                        f"cy={(det['box'][1] + det['box'][3]) // 2} "
+                        f"h={det['bbox_h']:.1f} conf={det['conf']:.2f} "
+                        f"reply='{last_motor_status.get('fpga_reply', '')}'"
+                    )
+            draw(frame, args, det, recent, saved_count, last_saved, last_motor_status)
             cv2.imshow(window_name, frame)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
@@ -191,6 +237,8 @@ def main():
                 else:
                     print("[bbox-cal] no recent bbox samples; not saved")
     finally:
+        if motor is not None:
+            motor.stop()
         cam.stop()
         cv2.destroyWindow(window_name)
 

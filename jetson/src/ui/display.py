@@ -78,6 +78,8 @@ class AntiDroneDisplay:
 
         reticle_color = GREEN if target_visible else AMBER if audio_detected and audio_age < 2.0 else MUTED
         self._draw_target_box(frame, target)
+        if getattr(config, "UI_SHOW_LASER_CENTER_MARKER", False):
+            self._draw_laser_center_marker(frame, w // 2, h // 2)
         if getattr(config, "UI_SHOW_RETICLE", True):
             self._draw_reticle(frame, reticle_x, reticle_y, reticle_color)
         self._draw_top_status(frame, fps, state, target, audio_detected, audio_status, audio_score, audio_doa, audio_age)
@@ -97,6 +99,17 @@ class AntiDroneDisplay:
         cv2.line(frame, (cx - 10, cy), (cx + 10, cy), MUTED, 1, cv2.LINE_AA)
         cv2.line(frame, (cx, cy - 10), (cx, cy + 10), MUTED, 1, cv2.LINE_AA)
         cv2.circle(frame, (cx, cy), 18, MUTED, 1, cv2.LINE_AA)
+
+    def _draw_laser_center_marker(self, frame, cx, cy):
+        gap = 34
+        arm = 76
+        color = GREEN
+        cv2.circle(frame, (cx, cy), 26, color, 2, cv2.LINE_AA)
+        cv2.circle(frame, (cx, cy), 4, CYAN, -1, cv2.LINE_AA)
+        cv2.line(frame, (cx - arm, cy), (cx - gap, cy), color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx + gap, cy), (cx + arm, cy), color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx, cy - arm), (cx, cy - gap), color, 2, cv2.LINE_AA)
+        cv2.line(frame, (cx, cy + gap), (cx, cy + arm), color, 2, cv2.LINE_AA)
 
     def _draw_target_box(self, frame, target):
         if not target:

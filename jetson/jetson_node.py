@@ -658,8 +658,14 @@ def main():
                     target = box
                     break
 
-            laser_should_on = bool(target)
-            laser.set_active(laser_should_on, "bbox" if laser_should_on else "no_target")
+            laser_should_on = bool(getattr(config, "LASER_ALWAYS_ON", False)) or (
+                bool(getattr(config, "LASER_AUTO_ON_TARGET", True)) and bool(target)
+            )
+            if bool(getattr(config, "LASER_ALWAYS_ON", False)):
+                laser_reason = "always_on"
+            else:
+                laser_reason = "bbox" if target else "no_target"
+            laser.set_active(laser_should_on, laser_reason)
             laser_status = laser.status()
 
             if target and config.TRACK_VISION_MOTOR_ENABLE:

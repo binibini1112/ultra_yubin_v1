@@ -634,19 +634,7 @@ def main():
                     target = box
                     break
 
-            laser_now = time.perf_counter()
-            laser_should_on = bool(getattr(config, "LASER_ALWAYS_ON", False))
-            laser_should_on = laser_should_on or (
-                bool(target) and bool(getattr(config, "LASER_AUTO_ON_TARGET", True))
-            )
-            if laser_should_on:
-                last_laser_target_seen = laser_now
-            elif (
-                bool(getattr(config, "LASER_AUTO_ON_TARGET", True))
-                and last_laser_target_seen > 0.0
-                and laser_now - last_laser_target_seen <= float(getattr(config, "LASER_LOST_GRACE_SEC", 0.08))
-            ):
-                laser_should_on = True
+            laser_should_on = bool(target)
             laser.set_active(laser_should_on, "bbox" if laser_should_on else "no_target")
             laser_status = laser.status()
 

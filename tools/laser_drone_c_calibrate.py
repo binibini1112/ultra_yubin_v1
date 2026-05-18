@@ -85,7 +85,37 @@ def load_output(path):
     return data
 
 
-def save_sample(args, recent, laser_tick):
+def parse_stage_spec(text):
+    stages = []
+    for raw_item in str(text).split(","):
+        item = raw_item.strip()
+        if not item:
+            continue
+        parts = item.split(":")
+        if len(parts) != 3:
+            raise ValueError(f"bad stage item '{item}', expected name:tilt_offset:saves")
+        name = parts[0].strip()
+        if not name:
+            raise ValueError(f"bad stage item '{item}', empty name")
+        stages.append({
+            "name": name,
+            "tilt_offset": int(parts[1]),
+            "required": max(1, int(parts[2])),
+            "saved": 0,
+        })
+    if not stages:
+        raise ValueError("stage spec produced no stages")
+    return stages
+
+
+def move_pan_tilt(args, pan, tilt):
+    pan = clamp_tick(pan)
+    tilt = clamp_tick(tilt)
+    reply = request(args.host, args.port, f"G {pan} {tilt}", args.timeout)
+    return pan, tilt, reply
+
+
+def save_sample(args, recent, laser_tick, stage=None, target_pan=None, target_tilt=None):
     rows = list(recent)
     bbox_h = float(np.mean([r["bbox_h"] for r in rows]))
     bbox_w = float(np.mean([r["bbox_w"] for r in rows]))
@@ -101,6 +131,17 @@ def save_sample(args, recent, laser_tick):
         "sample_count": len(rows),
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
     }
+    if args.distance_m is not None:
+        sample["distance_m"] = round(float(args.distance_m), 3)
+        sample["distance_mm"] = int(round(float(args.distance_m) * 1000.0))
+    if stage is not None:
+        sample["pose"] = str(stage.get("name", ""))
+        sample["pose_tilt_offset"] = int(stage.get("tilt_offset", 0))
+        sample["pose_required_count"] = int(stage.get("required", 0))
+    if target_pan is not None:
+        sample["pan_tick"] = int(target_pan)
+    if target_tilt is not None:
+        sample["tilt_tick"] = int(target_tilt)
     data = load_output(args.output)
     data["samples"].append(sample)
     data["samples"].sort(key=lambda item: float(item.get("bbox_h", 0.0)))
@@ -138,7 +179,7 @@ def best_detection(result):
     return best
 
 
-def draw(frame, args, det, recent, laser_tick, step, saved_count, last_saved):
+def draw(frame, args, det, recent, laser_tick, step, saved_count, last_saved, stage=None, target_pan=None, target_tilt=None):
     h, w = frame.shape[:2]
     cx, cy = w // 2, h // 2
     green = (80, 230, 90)
@@ -152,9 +193,13 @@ def draw(frame, args, det, recent, laser_tick, step, saved_count, last_saved):
     cv2.line(frame, (cx - 42, cy), (cx + 42, cy), green, 1, cv2.LINE_AA)
     cv2.line(frame, (cx, cy - 42), (cx, cy + 42), green, 1, cv2.LINE_AA)
     cv2.circle(frame, (cx, cy), 4, green, -1, cv2.LINE_AA)
-    cv2.putText(frame, f"DRONE LASER CAL  C{args.laser_id}={laser_tick} step={step} recent={len(recent)}/{args.window}",
+    stage_text = ""
+    if stage is not None:
+        stage_text = f" | pose={stage['name']} {stage['saved']}/{stage['required']} pan={target_pan} tilt={target_tilt}"
+    dist_text = "" if args.distance_m is None else f" dist={args.distance_m:.2f}m"
+    cv2.putText(frame, f"DRONE LASER CAL{dist_text}  C{args.laser_id}={laser_tick} step={step} recent={len(recent)}/{args.window}{stage_text}",
                 (14, 28), cv2.FONT_HERSHEY_SIMPLEX, 0.60, white, 1, cv2.LINE_AA)
-    cv2.putText(frame, "j/k C | J/K big | [/] step | SPACE save when pointer hits bbox center | c clear | q quit",
+    cv2.putText(frame, "j/k C | J/K big | [/] step | SPACE save | n/p pose | g reapply pose | c clear | q quit",
                 (14, 58), cv2.FONT_HERSHEY_SIMPLEX, 0.48, amber, 1, cv2.LINE_AA)
 
     if det:
@@ -193,6 +238,15 @@ def main():
     parser.add_argument("--laser-center", type=int, default=int(os.getenv("ULTRA_CHAN_LASER_CENTER", "2048")))
     parser.add_argument("--step", type=int, default=4)
     parser.add_argument("--big-step", type=int, default=40)
+    parser.add_argument("--distance-m", type=float, default=None, help="Optional measured drone distance for saved sample metadata")
+    parser.add_argument("--base-pan", type=int, default=int(os.getenv("LASER_CAL_PAN_TICK", "2048")))
+    parser.add_argument("--base-tilt", type=int, default=int(os.getenv("LASER_CAL_TILT_TICK", "2772")))
+    parser.add_argument(
+        "--stage-spec",
+        default=os.getenv("LASER_CAL_STAGE_SPEC", "center:0:3,up:-160:2,down:160:2"),
+        help="Comma list of name:tilt_offset:saves. Negative tilt offset looks upward on the current rig.",
+    )
+    parser.add_argument("--no-stage", action="store_true", help="Disable automatic pan/tilt stage positioning")
     args = parser.parse_args()
 
     os.environ["YOLO_CONF"] = str(args.conf)
@@ -213,12 +267,23 @@ def main():
     recent = deque(maxlen=max(1, int(args.window)))
     laser_tick, last_reply = read_laser_tick(args)
     step = max(1, int(args.step))
+    stages = [] if args.no_stage else parse_stage_spec(args.stage_spec)
+    stage_idx = 0
+    target_pan = clamp_tick(args.base_pan)
+    target_tilt = clamp_tick(args.base_tilt)
+    if stages:
+        target_tilt = clamp_tick(args.base_tilt + stages[stage_idx]["tilt_offset"])
+        target_pan, target_tilt, last_reply = move_pan_tilt(args, target_pan, target_tilt)
+        print(f"[laser-drone-cal] pose {stages[stage_idx]['name']} => pan={target_pan} tilt={target_tilt} reply={last_reply}")
     saved_count = 0
     last_saved = ""
     window_name = "ULTRA YUBIN V1 DRONE LASER CAL"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
     print(f"[laser-drone-cal] output={args.output}")
     print("[laser-drone-cal] Put laser pointer on bbox center, then SPACE save.")
+    if stages:
+        print(f"[laser-drone-cal] staged mode base_pan={args.base_pan} base_tilt={args.base_tilt} stages={args.stage_spec}")
+        print("[laser-drone-cal] SPACE saves current pose; n/p changes pose; g reapplies pose.")
 
     try:
         while True:
@@ -230,7 +295,8 @@ def main():
             det = best_detection(result)
             if det and det["conf"] >= args.conf:
                 recent.append(det)
-            draw(frame, args, det, recent, laser_tick, step, saved_count, last_saved)
+            stage = stages[stage_idx] if stages else None
+            draw(frame, args, det, recent, laser_tick, step, saved_count, last_saved, stage, target_pan, target_tilt)
             cv2.imshow(window_name, frame)
             key = cv2.waitKey(1) & 0xFF
             if key in (ord("q"), 27):
@@ -257,12 +323,44 @@ def main():
             elif key == ord("K"):
                 laser_tick, last_reply = move_laser(args, laser_tick, args.big_step)
                 print(f"C +{args.big_step} => tick={laser_tick} reply={last_reply}")
+            elif key in (ord("n"), ord("p")) and stages:
+                if key == ord("n"):
+                    stage_idx = min(len(stages) - 1, stage_idx + 1)
+                else:
+                    stage_idx = max(0, stage_idx - 1)
+                target_pan = clamp_tick(args.base_pan)
+                target_tilt = clamp_tick(args.base_tilt + stages[stage_idx]["tilt_offset"])
+                target_pan, target_tilt, last_reply = move_pan_tilt(args, target_pan, target_tilt)
+                recent.clear()
+                last_saved = f"pose {stages[stage_idx]['name']}"
+                print(f"[laser-drone-cal] pose {stages[stage_idx]['name']} => pan={target_pan} tilt={target_tilt} reply={last_reply}")
+            elif key == ord("g") and stages:
+                target_pan = clamp_tick(args.base_pan)
+                target_tilt = clamp_tick(args.base_tilt + stages[stage_idx]["tilt_offset"])
+                target_pan, target_tilt, last_reply = move_pan_tilt(args, target_pan, target_tilt)
+                recent.clear()
+                last_saved = f"reapplied {stages[stage_idx]['name']}"
+                print(f"[laser-drone-cal] reapply {stages[stage_idx]['name']} => pan={target_pan} tilt={target_tilt} reply={last_reply}")
             elif key == ord(" "):
                 if recent:
-                    sample = save_sample(args, recent, laser_tick)
+                    stage = stages[stage_idx] if stages else None
+                    sample = save_sample(args, recent, laser_tick, stage, target_pan, target_tilt)
                     saved_count += 1
+                    if stage is not None:
+                        stage["saved"] += 1
                     last_saved = f"h={sample['bbox_h']} C={sample['laser_tilt_tick']} n={sample['sample_count']}"
                     print(f"SAVED => {sample}")
+                    recent.clear()
+                    if stages and stages[stage_idx]["saved"] >= stages[stage_idx]["required"] and stage_idx < len(stages) - 1:
+                        stage_idx += 1
+                        target_pan = clamp_tick(args.base_pan)
+                        target_tilt = clamp_tick(args.base_tilt + stages[stage_idx]["tilt_offset"])
+                        target_pan, target_tilt, last_reply = move_pan_tilt(args, target_pan, target_tilt)
+                        last_saved = f"auto pose {stages[stage_idx]['name']}"
+                        print(f"[laser-drone-cal] auto pose {stages[stage_idx]['name']} => pan={target_pan} tilt={target_tilt} reply={last_reply}")
+                    elif stages and all(s["saved"] >= s["required"] for s in stages):
+                        last_saved = "stage set complete"
+                        print("[laser-drone-cal] stage set complete for this distance")
                 else:
                     print("[laser-drone-cal] no recent bbox samples; not saved")
     finally:

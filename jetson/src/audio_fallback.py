@@ -7,6 +7,7 @@ import subprocess
 import sys
 import threading
 import time
+from collections import deque
 
 import numpy as np
 
@@ -104,6 +105,7 @@ class TelloAudioFallback:
         alsa_device="plughw:CARD=ArrayUAC10,DEV=0",
         channels=6,
         threshold=0.70,
+        min_avg_score=None,
         consecutive=2,
         cooldown_sec=1.2,
         min_rms=0.008,
@@ -114,6 +116,7 @@ class TelloAudioFallback:
         self.alsa_device = self._resolve_alsa_device(alsa_device)
         self.channels = int(channels)
         self.threshold = float(threshold)
+        self.min_avg_score = float(self.threshold if min_avg_score is None else min_avg_score)
         self.consecutive = int(consecutive)
         self.cooldown_sec = float(cooldown_sec)
         self.min_rms = float(min_rms)
@@ -235,6 +238,7 @@ class TelloAudioFallback:
     def _infer_loop(self):
         buf = np.zeros((0,), dtype=np.float32)
         hits = 0
+        hit_scores = deque(maxlen=max(1, self.consecutive))
         last_emit = 0.0
         while self._running:
             try:
@@ -249,11 +253,18 @@ class TelloAudioFallback:
             rms = float(np.sqrt(np.mean(mono * mono)))
             if rms < self.min_rms:
                 hits = 0
+                hit_scores.clear()
                 continue
             score = self._predict_score(mono)
-            hits = hits + 1 if score >= self.threshold else 0
+            if score >= self.threshold:
+                hits += 1
+                hit_scores.append(score)
+            else:
+                hits = 0
+                hit_scores.clear()
+            avg_score = float(np.mean(hit_scores)) if hit_scores else 0.0
             now = time.time()
-            if hits >= self.consecutive and now - last_emit >= self.cooldown_sec:
+            if hits >= self.consecutive and avg_score >= self.min_avg_score and now - last_emit >= self.cooldown_sec:
                 last_emit = now
                 doa = self._normalize_relative_angle(self._doa.read())
                 with self._lock:
@@ -295,6 +306,7 @@ class JunmoDroneAudioFallback:
         alsa_device="auto",
         channels=6,
         threshold=0.70,
+        min_avg_score=None,
         consecutive=2,
         cooldown_sec=0.6,
         min_rms=0.008,
@@ -309,6 +321,7 @@ class JunmoDroneAudioFallback:
         self.alsa_device = self._resolve_alsa_device(alsa_device)
         self.channels = int(channels)
         self.threshold = float(threshold)
+        self.min_avg_score = float(self.threshold if min_avg_score is None else min_avg_score)
         self.consecutive = int(consecutive)
         self.cooldown_sec = float(cooldown_sec)
         self.min_rms = float(min_rms)
@@ -387,6 +400,7 @@ class JunmoDroneAudioFallback:
                 on_detect,
                 self.model_path,
                 threshold=self.threshold,
+                min_avg_score=self.min_avg_score,
                 consecutive=self.consecutive,
                 cooldown=self.cooldown_sec,
                 min_rms=self.min_rms,

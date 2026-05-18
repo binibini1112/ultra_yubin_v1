@@ -322,6 +322,7 @@ def run(
     on_detect,
     model_path,
     threshold=0.70,
+    min_avg_score=None,
     consecutive=2,
     cooldown=2.0,
     min_rms=0.008,
@@ -335,6 +336,7 @@ def run(
     if verbose is None:
         verbose = os.getenv("TELLO_AUDIO_VERBOSE", "0") == "1"
     detector = DroneAudioDetector(model_path)
+    min_avg_score = float(threshold if min_avg_score is None else min_avg_score)
 
     doa_reader = None
     doa_history = None
@@ -357,6 +359,7 @@ def run(
     audio_q = queue.Queue()
     audio_buf = np.zeros((0, max(1, int(n_channels))), dtype=np.float32)
     hit_count = 0
+    hit_scores = deque(maxlen=max(1, int(consecutive)))
     last_detect = 0.0
 
     if audio_backend not in ("arecord", "sounddevice"):
@@ -378,7 +381,10 @@ def run(
     if verbose:
         print("\n[Drone Audio Pipeline] Ctrl+C to stop")
         print(f"  model={model_path}")
-        print(f"  threshold={threshold:.2f} consecutive={consecutive} cooldown={cooldown:.1f}s")
+        print(
+            f"  threshold={threshold:.2f} min_avg={min_avg_score:.2f} "
+            f"consecutive={consecutive} cooldown={cooldown:.1f}s"
+        )
         print(f"  rms gate={min_rms:.4f} channels={n_channels} backend={audio_backend}")
         print(f"  device={device if audio_backend == 'sounddevice' else alsa_device}")
         print(f"  doa={active_doa_method} mic_distance={mic_distance:.3f}m\n")
@@ -445,6 +451,7 @@ def run(
 
                 if rms < min_rms:
                     hit_count = 0
+                    hit_scores.clear()
                     if verbose:
                         print(
                             f"\r  drone=quiet rms={rms:.4f} doa={doa:6.1f}° "
@@ -457,22 +464,28 @@ def run(
                 score = detector.predict(mono)
                 if score >= threshold:
                     hit_count += 1
+                    hit_scores.append(score)
                 else:
                     hit_count = 0
+                    hit_scores.clear()
+                avg_score = float(np.mean(hit_scores)) if hit_scores else 0.0
 
                 if verbose:
                     print(
-                        f"\r  drone={score:.3f} hit={hit_count}/{consecutive} rms={rms:.4f} "
+                        f"\r  drone={score:.3f} avg={avg_score:.3f} hit={hit_count}/{consecutive} rms={rms:.4f} "
                         f"doa={doa:6.1f}° section={section}({SECTION_LABEL[section]})      ",
                         end="",
                         flush=True,
                     )
 
                 now = time.time()
-                if hit_count >= consecutive and now - last_detect >= cooldown:
+                if hit_count >= consecutive and avg_score >= min_avg_score and now - last_detect >= cooldown:
                     last_detect = now
                     action = {"action": "move", "section": section, "confidence": score}
-                    print(f"[DRONE-AUDIO] DETECTED score={score:.3f} doa={doa:.1f}° section={section}")
+                    print(
+                        f"[DRONE-AUDIO] DETECTED score={score:.3f} avg={avg_score:.3f} "
+                        f"doa={doa:.1f}° section={section}"
+                    )
                     on_detect("DRONE_AUDIO", doa, section, False, 1, action)
 
         except KeyboardInterrupt:

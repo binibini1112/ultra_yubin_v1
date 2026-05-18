@@ -32,7 +32,7 @@
 #define TILT_CENTER 2772u
 #define GOAL_MIN 0u
 #define GOAL_MAX 4095u
-#define AUDIO_TICKS_PER_DEG 11
+#define PAN_TICKS_PER_REV 4096
 #define ADDR_TORQUE_ENABLE 64u
 #define ADDR_PROFILE_ACCEL 108u
 #define ADDR_PROFILE_VELOCITY 112u
@@ -102,6 +102,30 @@ static uint32_t clamp_goal_i64(int64_t value)
         return GOAL_MAX;
     }
     return (uint32_t)value;
+}
+
+static uint32_t wrap_pan_goal_i64(int64_t value)
+{
+    value %= PAN_TICKS_PER_REV;
+    if (value < 0) {
+        value += PAN_TICKS_PER_REV;
+    }
+    return (uint32_t)value;
+}
+
+static int64_t pan_delta_ticks_from_deg(int64_t angle_deg)
+{
+    int64_t numerator = angle_deg * PAN_TICKS_PER_REV;
+    if (numerator >= 0) {
+        return (numerator + 180) / 360;
+    }
+    return (numerator - 180) / 360;
+}
+
+static uint32_t audio_pan_goal_from_angle(int angle_deg, uint32_t front_pan)
+{
+    int64_t delta = pan_delta_ticks_from_deg((int64_t)angle_deg);
+    return wrap_pan_goal_i64((int64_t)front_pan + delta);
 }
 
 static int64_t clamp_correction_i64(int64_t value, int64_t max_correction)
@@ -1343,7 +1367,7 @@ int main(int argc, char **argv)
             uint32_t tilt_now = front_tilt;
             uint32_t count;
             if (valid) {
-                pan_now = clamp_goal_i64((int64_t)front_pan + ((int64_t)angle * AUDIO_TICKS_PER_DEG));
+                pan_now = audio_pan_goal_from_angle(angle, front_pan);
                 sw_pan = pan_now;
                 sw_tilt = tilt_now;
                 sw_count++;

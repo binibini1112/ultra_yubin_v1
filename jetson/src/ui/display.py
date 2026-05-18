@@ -108,8 +108,9 @@ class AntiDroneDisplay:
         cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2, cv2.LINE_AA)
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
-        cv2.line(frame, (cx - 12, cy), (cx + 12, cy), color, 2, cv2.LINE_AA)
-        cv2.line(frame, (cx, cy - 12), (cx, cy + 12), color, 2, cv2.LINE_AA)
+        if getattr(config, "UI_SHOW_BBOX_CROSSHAIR", True):
+            cv2.line(frame, (cx - 12, cy), (cx + 12, cy), color, 2, cv2.LINE_AA)
+            cv2.line(frame, (cx, cy - 12), (cx, cy + 12), color, 2, cv2.LINE_AA)
         if getattr(config, "UI_SHOW_BBOX_LABEL", True):
             label = f"DRONE {conf:.2f}"
             self._label(frame, label, x1, max(26, y1 - 8), color)

@@ -289,6 +289,23 @@ def laser_goal_for_bbox(base_tick, bbox_cy, frame_h):
     return clamp_tick(goal)
 
 
+def laser_center_range_offset_ticks(bbox_h):
+    if not bool(getattr(config, "LASER_CAMERA_CENTER_RANGE_COMP", False)):
+        return 0
+    near_h = float(getattr(config, "LASER_CAMERA_CENTER_NEAR_BBOX_H", 64.0))
+    far_h = float(getattr(config, "LASER_CAMERA_CENTER_FAR_BBOX_H", 19.0))
+    far_offset = int(getattr(config, "LASER_CAMERA_CENTER_FAR_OFFSET_TICK", 36))
+    h = float(max(1.0, bbox_h or 0.0))
+    if near_h <= far_h:
+        return 0
+    if h >= near_h:
+        return 0
+    if h <= far_h:
+        return far_offset
+    ratio = (near_h - h) / max(1e-6, near_h - far_h)
+    return int(round(ratio * far_offset))
+
+
 def audio_doa_to_motor_angle(doa_angle):
     zero_doa = float(getattr(config, "TELLO_AUDIO_MOTOR_ZERO_DOA_DEG", 90.0))
     sign = float(getattr(config, "TELLO_AUDIO_DOA_SIGN", 1))
@@ -469,6 +486,8 @@ def main():
     laser_tick_estimator = LaserTickEstimator(
         getattr(config, "LASER_BBOX_TICK_MODEL_PATH", ""),
     )
+    laser_center_lock_enabled = bool(getattr(config, "LASER_CAMERA_CENTER_LOCK", False))
+    laser_center_lock_tick = int(getattr(config, "LASER_CAMERA_CENTER_TICK", 1965))
     audio = None
     audio_started = False
     audio_lazy_start = bool(getattr(config, "TELLO_AUDIO_LAZY_START", False))
@@ -482,6 +501,7 @@ def main():
                     alsa_device=config.TELLO_AUDIO_ALSA_DEVICE,
                     channels=config.TELLO_AUDIO_CHANNELS,
                     threshold=config.TELLO_AUDIO_THRESHOLD,
+                    min_avg_score=config.TELLO_AUDIO_MIN_AVG_SCORE,
                     consecutive=config.TELLO_AUDIO_CONSECUTIVE,
                     min_rms=config.TELLO_AUDIO_MIN_RMS,
                     doa_offset=config.TELLO_AUDIO_DOA_OFFSET,
@@ -497,6 +517,7 @@ def main():
                     alsa_device=config.TELLO_AUDIO_ALSA_DEVICE,
                     channels=config.TELLO_AUDIO_CHANNELS,
                     threshold=config.TELLO_AUDIO_THRESHOLD,
+                    min_avg_score=config.TELLO_AUDIO_MIN_AVG_SCORE,
                     consecutive=config.TELLO_AUDIO_CONSECUTIVE,
                     cooldown_sec=config.TELLO_AUDIO_COOLDOWN_SEC,
                     min_rms=config.TELLO_AUDIO_MIN_RMS,
@@ -526,6 +547,7 @@ def main():
             print(
                 f"[audio] fallback=on mode={audio_mode} device={audio_device} "
                 f"threshold={config.TELLO_AUDIO_THRESHOLD} "
+                f"min_avg={config.TELLO_AUDIO_MIN_AVG_SCORE} "
                 f"consecutive={config.TELLO_AUDIO_CONSECUTIVE} "
                 f"offset={config.TELLO_AUDIO_DOA_OFFSET} "
                 f"lazy={int(audio_lazy_start)} verbose={int(config.TELLO_AUDIO_VERBOSE)}"
@@ -551,6 +573,7 @@ def main():
     threat_info = None
     last_audio_sent = 0.0
     last_audio_angle = None
+    last_audio_detection_time = 0.0
     smooth_target_center = None
     last_raw_target_center = None
     last_motor_target_center = None
@@ -567,10 +590,16 @@ def main():
     last_laser_aim_sent = 0.0
     last_laser_aim_tick = None
     if laser_runtime_cal_enabled:
-        print(
-            "[LASER-CAL] final-run calibration enabled: "
-            "j/k C | J/K big | [/] step | s save bbox-center hit | SPACE laser pattern"
-        )
+        if laser_center_lock_enabled:
+            print(
+                "[LASER-CAL] camera-center laser lock: "
+                "j/k C center adjust | J/K big | [/] step | SPACE laser pattern"
+            )
+        else:
+            print(
+                "[LASER-CAL] final-run calibration enabled: "
+                "j/k C | J/K big | [/] step | s save bbox-center hit | SPACE laser pattern"
+            )
     audio_stabilizer = AudioDirectionStabilizer(
         window=config.TELLO_AUDIO_STABLE_WINDOW,
         min_votes=config.TELLO_AUDIO_STABLE_MIN_VOTES,
@@ -641,8 +670,14 @@ def main():
                 bw = int(x2 - x1)
                 bh = int(y2 - y1)
                 distance_mm = distance_estimator.estimate(bw, bh)
-                laser_base_tick = laser_tick_estimator.estimate(bw, bh)
-                laser_goal_tick = laser_goal_for_bbox(laser_base_tick, raw_cy, frame_h)
+                range_laser_offset_tick = laser_center_range_offset_ticks(bh)
+                active_laser_center_lock_tick = clamp_tick(laser_center_lock_tick + range_laser_offset_tick)
+                if laser_center_lock_enabled:
+                    laser_base_tick = active_laser_center_lock_tick
+                    laser_goal_tick = active_laser_center_lock_tick
+                else:
+                    laser_base_tick = laser_tick_estimator.estimate(bw, bh)
+                    laser_goal_tick = laser_goal_for_bbox(laser_base_tick, raw_cy, frame_h)
                 if laser_runtime_cal_enabled:
                     laser_cal_recent.append({
                         "bbox_h": float(max(0, bh)),
@@ -652,7 +687,11 @@ def main():
                     })
                     if laser_manual_tick is not None:
                         laser_base_tick = laser_manual_tick
-                        laser_goal_tick = laser_goal_for_bbox(laser_base_tick, raw_cy, frame_h)
+                        if laser_center_lock_enabled:
+                            active_laser_center_lock_tick = int(laser_manual_tick)
+                            laser_goal_tick = laser_base_tick
+                        else:
+                            laser_goal_tick = laser_goal_for_bbox(laser_base_tick, raw_cy, frame_h)
                 threat_info = analyzer.update(target["box"])
                 conf = float(target.get("conf", 0.0))
                 held = bool(target.get("held", False))
@@ -847,6 +886,7 @@ def main():
                         bh,
                         distance_mm=distance_mm,
                         laser_base_tick=laser_base_tick,
+                        laser_center_lock_tick=active_laser_center_lock_tick if laser_center_lock_enabled else None,
                         aim_center_x=camera_center_x,
                         aim_center_y=camera_center_y,
                     )
@@ -875,9 +915,11 @@ def main():
                         last_laser_aim_sent = now_laser_aim
                         last_laser_aim_tick = goal
                         if frame_idx % 30 == 0:
+                            aim_mode = "center" if laser_center_lock_enabled else "bbox"
                             print(
-                                f"[LASER-AIM] bbox_h={bh} cy={raw_cy} "
-                                f"base={laser_base_tick} goal={goal} ok={int(ok)} reply={reply}"
+                                f"[LASER-AIM] mode={aim_mode} bbox_h={bh} cy={raw_cy} "
+                                f"range_offset={range_laser_offset_tick} base={laser_base_tick} "
+                                f"goal={goal} ok={int(ok)} reply={reply}"
                             )
                 event = "target_lock" if center_locked else "target_track"
             else:
@@ -959,6 +1001,13 @@ def main():
                 else:
                     audio_detection = None
                 if audio_detection:
+                    detection_time = float(audio_detection.get("time", 0.0) or 0.0)
+                    if detection_time and detection_time <= last_audio_detection_time:
+                        audio_detection = None
+                if audio_detection:
+                    detection_time = float(audio_detection.get("time", 0.0) or 0.0)
+                    if detection_time:
+                        last_audio_detection_time = detection_time
                     if audio_mode in ("junmo", "doa"):
                         signed_angle = audio_doa_to_motor_angle(audio_detection["angle"])
                     else:
@@ -1187,6 +1236,9 @@ def main():
                         last_telemetry = motor.last_telemetry
                         print(f"[LASER-CAL] C {delta:+d} => tick={goal} ok={int(ok)} reply={reply}")
                     elif key in (ord("s"), ord("S")):
+                        if laser_center_lock_enabled:
+                            print("[LASER-CAL] center-lock mode: s save skipped; use j/k and LASER_CAMERA_CENTER_TICK")
+                            continue
                         save_tick = laser_manual_tick
                         if save_tick is None:
                             save_tick = last_telemetry.get("laser")

@@ -12,6 +12,17 @@ def _get_config_value(name, default):
         return default
 
 
+def _clamp_tick(value):
+    return max(0, min(4095, int(round(float(value)))))
+
+
+def _laser_image_offset_ticks(cy, frame_h):
+    frame_h = max(1, int(frame_h))
+    fov_deg = float(_get_config_value("ULTRA_CHAN_LASER_VERTICAL_FOV_DEG", 43.0))
+    err_y = int(cy) - (frame_h // 2)
+    return int((-err_y * fov_deg * 1024.0) / (90.0 * float(frame_h)))
+
+
 class UltraYubinMotorController:
     """MotorController-compatible adapter for the ultra_yubin architecture.
 
@@ -234,6 +245,7 @@ class UltraYubinMotorController:
         bbox_height=None,
         distance_mm=None,
         laser_base_tick=None,
+        laser_center_lock_tick=None,
         aim_center_x=None,
         aim_center_y=None,
     ):
@@ -317,7 +329,12 @@ class UltraYubinMotorController:
         control_cx = max(0, min(img_width, control_cx))
         control_cy = max(0, min(img_height, control_cy))
         dist_arg = 0 if distance_mm is None else max(0, int(distance_mm))
-        laser_arg = 0 if laser_base_tick is None else max(0, min(4095, int(laser_base_tick)))
+        if laser_center_lock_tick is not None:
+            laser_img_ticks = _laser_image_offset_ticks(control_cy, img_height)
+            laser_arg = _clamp_tick(int(laser_center_lock_tick) - laser_img_ticks)
+        else:
+            laser_img_ticks = None
+            laser_arg = 0 if laser_base_tick is None else _clamp_tick(laser_base_tick)
         cmd = (
             f"T {control_cx} {control_cy} {bbox_width} {bbox_height} "
             f"{img_width} {img_height} {self.default_conf} 1 {dist_arg} {laser_arg}"
@@ -352,6 +369,8 @@ class UltraYubinMotorController:
                     "async_send": 1,
                     "distance_mm": distance_mm,
                     "laser_base_tick": laser_base_tick,
+                    "laser_center_lock_tick": laser_center_lock_tick,
+                    "laser_img_ticks": laser_img_ticks,
                 })
                 return dict(self.last_telemetry)
             reply, elapsed_ms = self._request(cmd)

@@ -73,6 +73,9 @@ class PipelineLogger:
                 "aim_cy": telemetry.get("aim_cy"),
                 "send_cx": telemetry.get("send_cx"),
                 "send_cy": telemetry.get("send_cy"),
+                "distance_mm": telemetry.get("distance_mm"),
+                "laser_center_tick": telemetry.get("laser_center_lock_tick"),
+                "laser_range_offset_tick": telemetry.get("laser_range_offset_tick"),
             },
         }
         if extra:
@@ -103,6 +106,9 @@ class PipelineLogger:
                 f"pan={record['ultra96']['pan']} "
                 f"tilt={record['ultra96']['tilt']} usb={record['ultra96']['usb']} "
                 f"src={record['ultra96'].get('src', '')} "
+                f"dist_m={fmt_distance_m(record['ultra96'].get('distance_mm'))} "
+                f"laser_tick={record['ultra96'].get('laser_center_tick', '-')} "
+                f"laser_off={record['ultra96'].get('laser_range_offset_tick', '-')} "
                 f"{audio_text} "
                 f"reply='{str(record['ultra96']['reply'])[:130]}'"
             )
@@ -268,6 +274,15 @@ def clamp_tick(tick):
     return max(0, min(4095, int(round(float(tick)))))
 
 
+def fmt_distance_m(distance_mm):
+    if distance_mm in (None, ""):
+        return "-"
+    try:
+        return f"{float(distance_mm) / 1000.0:.2f}"
+    except Exception:
+        return "-"
+
+
 def laser_image_offset_ticks(cy, frame_h):
     frame_h = max(1, int(frame_h or 0))
     fov_deg = float(getattr(config, "ULTRA_CHAN_LASER_VERTICAL_FOV_DEG", 43.0))
@@ -289,9 +304,18 @@ def laser_goal_for_bbox(base_tick, bbox_cy, frame_h):
     return clamp_tick(goal)
 
 
-def laser_center_range_offset_ticks(bbox_h):
+def laser_center_range_offset_ticks(bbox_h, distance_mm=None):
     if not bool(getattr(config, "LASER_CAMERA_CENTER_RANGE_COMP", False)):
         return 0
+    if bool(getattr(config, "LASER_CAMERA_CENTER_RANGE_COMP_USE_DISTANCE", False)) and distance_mm:
+        near_mm = float(getattr(config, "LASER_CAMERA_CENTER_NEAR_DISTANCE_MM", 1000))
+        far_mm = float(getattr(config, "LASER_CAMERA_CENTER_FAR_DISTANCE_MM", 3000))
+        far_offset = int(getattr(config, "LASER_CAMERA_CENTER_FAR_OFFSET_TICK", 36))
+        if far_mm <= near_mm:
+            return 0
+        ratio = (float(distance_mm) - near_mm) / max(1e-6, far_mm - near_mm)
+        ratio = max(0.0, min(1.0, ratio))
+        return int(round(ratio * far_offset))
     near_h = float(getattr(config, "LASER_CAMERA_CENTER_NEAR_BBOX_H", 64.0))
     far_h = float(getattr(config, "LASER_CAMERA_CENTER_FAR_BBOX_H", 19.0))
     far_offset = int(getattr(config, "LASER_CAMERA_CENTER_FAR_OFFSET_TICK", 36))
@@ -658,7 +682,7 @@ def main():
                 bw = int(x2 - x1)
                 bh = int(y2 - y1)
                 distance_mm = distance_estimator.estimate(bw, bh)
-                range_laser_offset_tick = laser_center_range_offset_ticks(bh)
+                range_laser_offset_tick = laser_center_range_offset_ticks(bh, distance_mm)
                 active_laser_center_lock_tick = clamp_tick(laser_center_lock_tick + range_laser_offset_tick)
                 if laser_center_lock_enabled:
                     laser_base_tick = active_laser_center_lock_tick
@@ -878,6 +902,11 @@ def main():
                         aim_center_x=camera_center_x,
                         aim_center_y=camera_center_y,
                     )
+                last_telemetry.update({
+                    "distance_mm": distance_mm,
+                    "laser_range_offset_tick": range_laser_offset_tick,
+                    "laser_center_lock_tick": active_laser_center_lock_tick if laser_center_lock_enabled else None,
+                })
                 telemetry_cmd = str(last_telemetry.get("tx_cmd", ""))
                 if telemetry_cmd.startswith("T "):
                     last_laser_aim_sent = time.perf_counter()
@@ -900,6 +929,11 @@ def main():
                     ):
                         ok, goal, reply = motor.set_laser_tick(laser_goal_tick)
                         last_telemetry = motor.last_telemetry
+                        last_telemetry.update({
+                            "distance_mm": distance_mm,
+                            "laser_range_offset_tick": range_laser_offset_tick,
+                            "laser_center_lock_tick": active_laser_center_lock_tick if laser_center_lock_enabled else None,
+                        })
                         last_laser_aim_sent = now_laser_aim
                         last_laser_aim_tick = goal
                         if frame_idx % 30 == 0:

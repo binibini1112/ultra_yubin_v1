@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$0")" && pwd)"
+cd "${ROOT}"
+
+# Laser bbox-distance debug profile.
+# This intentionally disables the old bbox->laser JSON calibration path and
+# prints bbox-height distance/parallax/tick calculations during the normal
+# PL-drive demo run.
+export LASER_BBOX_TICK_MODEL_PATH="${LASER_BBOX_TICK_MODEL_PATH:-}"
+export LASER_RUNTIME_CALIBRATION="${LASER_RUNTIME_CALIBRATION:-0}"
+export LASER_CAMERA_CENTER_LOCK="${LASER_CAMERA_CENTER_LOCK:-1}"
+export LASER_CAMERA_CENTER_TICK="${LASER_CAMERA_CENTER_TICK:-1965}"
+export LASER_CAMERA_CENTER_RANGE_COMP="${LASER_CAMERA_CENTER_RANGE_COMP:-1}"
+export LASER_CAMERA_CENTER_NEAR_BBOX_H="${LASER_CAMERA_CENTER_NEAR_BBOX_H:-64}"
+export LASER_CAMERA_CENTER_NEAR_DISTANCE_MM="${LASER_CAMERA_CENTER_NEAR_DISTANCE_MM:-1000}"
+export LASER_CAMERA_CENTER_FAR_BBOX_H="${LASER_CAMERA_CENTER_FAR_BBOX_H:-19}"
+export LASER_CAMERA_CENTER_FAR_OFFSET_TICK="${LASER_CAMERA_CENTER_FAR_OFFSET_TICK:-36}"
+export LASER_CAMERA_CENTER_PARALLAX_SIGN="${LASER_CAMERA_CENTER_PARALLAX_SIGN:-1}"
+export LASER_RANGE_DEBUG=1
+export LASER_RANGE_DEBUG_EVERY="${LASER_RANGE_DEBUG_EVERY:-10}"
+
+echo "[laser_range_debug] old_json_cal=off center_tick=${LASER_CAMERA_CENTER_TICK} near=${LASER_CAMERA_CENTER_NEAR_BBOX_H}px@${LASER_CAMERA_CENTER_NEAR_DISTANCE_MM}mm far=${LASER_CAMERA_CENTER_FAR_BBOX_H}px offset=${LASER_CAMERA_CENTER_FAR_OFFSET_TICK} every=${LASER_RANGE_DEBUG_EVERY}"
+exec ./run_demo_pl_drive.sh "$@"

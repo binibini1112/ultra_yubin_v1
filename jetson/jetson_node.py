@@ -306,6 +306,32 @@ def laser_center_range_offset_ticks(bbox_h):
     return int(round(ratio * far_offset))
 
 
+def laser_bbox_distance_debug(bbox_h):
+    near_h = float(getattr(config, "LASER_CAMERA_CENTER_NEAR_BBOX_H", 64.0))
+    near_mm = float(getattr(config, "LASER_CAMERA_CENTER_NEAR_DISTANCE_MM", 1000))
+    h = float(max(1.0, bbox_h or 0.0))
+    if near_h <= 0.0 or near_mm <= 0.0:
+        return int(getattr(config, "DISTANCE_DEFAULT_MM", 3000))
+    distance_mm = near_mm * near_h / h
+    min_mm = int(getattr(config, "DISTANCE_MIN_MM", 500))
+    max_mm = int(getattr(config, "DISTANCE_MAX_MM", 8000))
+    return int(max(min_mm, min(max_mm, round(distance_mm))))
+
+
+def laser_parallax_debug_ticks(distance_mm):
+    offset_mm = float(getattr(config, "ULTRA_CHAN_CAMERA_LASER_OFFSET_MM", 37))
+    near_mm = float(getattr(config, "LASER_CAMERA_CENTER_NEAR_DISTANCE_MM", 1000))
+    distance_mm = float(max(1.0, distance_mm or near_mm))
+    near_mm = float(max(1.0, near_mm))
+    angle_deg = math.degrees(math.atan2(offset_mm, distance_mm))
+    near_angle_deg = math.degrees(math.atan2(offset_mm, near_mm))
+    delta_deg = near_angle_deg - angle_deg
+    ticks_per_deg = 4096.0 / 360.0
+    sign = int(getattr(config, "LASER_CAMERA_CENTER_PARALLAX_SIGN", 1))
+    delta_ticks = int(round(delta_deg * ticks_per_deg * sign))
+    return angle_deg, delta_deg, delta_ticks
+
+
 def audio_doa_to_motor_angle(doa_angle):
     zero_doa = float(getattr(config, "TELLO_AUDIO_MOTOR_ZERO_DOA_DEG", 90.0))
     sign = float(getattr(config, "TELLO_AUDIO_DOA_SIGN", 1))
@@ -672,6 +698,11 @@ def main():
                 distance_mm = distance_estimator.estimate(bw, bh)
                 range_laser_offset_tick = laser_center_range_offset_ticks(bh)
                 active_laser_center_lock_tick = clamp_tick(laser_center_lock_tick + range_laser_offset_tick)
+                bbox_distance_mm = laser_bbox_distance_debug(bh)
+                parallax_angle_deg, parallax_delta_deg, parallax_delta_tick = laser_parallax_debug_ticks(
+                    bbox_distance_mm
+                )
+                parallax_theory_tick = clamp_tick(laser_center_lock_tick + parallax_delta_tick)
                 if laser_center_lock_enabled:
                     laser_base_tick = active_laser_center_lock_tick
                     laser_goal_tick = active_laser_center_lock_tick
@@ -694,6 +725,21 @@ def main():
                             laser_goal_tick = laser_goal_for_bbox(laser_base_tick, raw_cy, frame_h)
                 threat_info = analyzer.update(target["box"])
                 conf = float(target.get("conf", 0.0))
+                if bool(getattr(config, "LASER_RANGE_DEBUG", False)):
+                    every = max(1, int(getattr(config, "LASER_RANGE_DEBUG_EVERY", 30)))
+                    if frame_idx % every == 0:
+                        print(
+                            "[LASER-RANGE] "
+                            f"f={frame_idx} bbox={bw}x{bh} conf={conf:.3f} "
+                            f"bbox_dist={bbox_distance_mm / 1000.0:.2f}m "
+                            f"parallax_angle={parallax_angle_deg:.3f}deg "
+                            f"delta_from_1m={parallax_delta_deg:.3f}deg/{parallax_delta_tick:+d}tick "
+                            f"linear_offset={range_laser_offset_tick:+d}tick "
+                            f"linear_tick={active_laser_center_lock_tick} "
+                            f"theory_tick={parallax_theory_tick} "
+                            f"center_tick={laser_center_lock_tick} "
+                            f"legacy_cal=off"
+                        )
                 held = bool(target.get("held", False))
                 area = max(0, bw * bh)
                 edge_x = int(config.TRACK_MOTOR_EDGE_MARGIN_X)

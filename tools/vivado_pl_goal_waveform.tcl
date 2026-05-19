@@ -1,4 +1,5 @@
-# Vivado report helper: run PL goal-compute RTL simulation and open waveform.
+# Vivado report helper: run PL goal-compute RTL simulation and open a clean
+# report waveform with only bbox input and computed pan/tilt goal signals.
 # Usage in Vivado Tcl Console:
 #   source C:/Users/hansung/examples/ultra_yubin_v1/tools/vivado_pl_goal_waveform.tcl
 
@@ -9,6 +10,30 @@ if {[catch {current_project} proj_name]} {
 set script_path [file normalize [info script]]
 set repo_dir [file dirname [file dirname $script_path]]
 set proj_dir [get_property DIRECTORY [current_project]]
+
+proc ensure_file_from_github {path url} {
+    if {[file exists $path]} {
+        return
+    }
+    puts "Missing: $path"
+    puts "Downloading: $url"
+    file mkdir [file dirname $path]
+    if {[catch {
+        exec powershell -NoProfile -ExecutionPolicy Bypass -Command "Invoke-WebRequest -Uri '$url' -OutFile '$path'"
+    } err]} {
+        puts "WARN: automatic download failed: $err"
+    }
+}
+
+ensure_file_from_github \
+    [file join $proj_dir tools vivado_pl_goal_waveform.tcl] \
+    "https://raw.githubusercontent.com/binibini1112/ultra_yubin_v1/main/tools/vivado_pl_goal_waveform.tcl"
+ensure_file_from_github \
+    [file join $proj_dir hardware pl_goal_compute rtl pl_goal_compute_axi.v] \
+    "https://raw.githubusercontent.com/binibini1112/ultra_yubin_v1/main/hardware/pl_goal_compute/rtl/pl_goal_compute_axi.v"
+ensure_file_from_github \
+    [file join $proj_dir hardware pl_goal_compute tb pl_goal_compute_axi_tb.v] \
+    "https://raw.githubusercontent.com/binibini1112/ultra_yubin_v1/main/hardware/pl_goal_compute/tb/pl_goal_compute_axi_tb.v"
 
 set rtl_candidates [list \
     [file join $repo_dir hardware pl_goal_compute rtl pl_goal_compute_axi.v] \
@@ -57,47 +82,29 @@ update_compile_order -fileset sim_1
 launch_simulation
 restart
 
-add_wave -divider "Clock / Reset"
-add_wave /pl_goal_compute_axi_tb/clk
-add_wave /pl_goal_compute_axi_tb/rstn
+set wave_name "goal_only_[clock seconds]"
+catch {create_wave_config $wave_name}
 
-add_wave -divider "AXI Write"
-add_wave -radix hex /pl_goal_compute_axi_tb/awaddr
-add_wave /pl_goal_compute_axi_tb/awvalid
-add_wave /pl_goal_compute_axi_tb/awready
-add_wave -radix unsigned /pl_goal_compute_axi_tb/wdata
-add_wave /pl_goal_compute_axi_tb/wvalid
-add_wave /pl_goal_compute_axi_tb/wready
-add_wave /pl_goal_compute_axi_tb/bvalid
-add_wave /pl_goal_compute_axi_tb/bready
+proc add_report_wave {sig} {
+    if {[catch {add_wave -radix decimal $sig} err]} {
+        puts "WARN: add_wave failed for $sig: $err"
+    }
+}
 
-add_wave -divider "AXI Read"
-add_wave -radix hex /pl_goal_compute_axi_tb/araddr
-add_wave /pl_goal_compute_axi_tb/arvalid
-add_wave /pl_goal_compute_axi_tb/arready
-add_wave -radix unsigned /pl_goal_compute_axi_tb/rdata
-add_wave /pl_goal_compute_axi_tb/rvalid
-add_wave /pl_goal_compute_axi_tb/rready
-
-add_wave -divider "PL Track Inputs"
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/track_cx
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/track_cy
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/track_fw
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/track_fh
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/track_conf
-add_wave /pl_goal_compute_axi_tb/dut/track_valid
-
-add_wave -divider "PL Computed Goals"
-add_wave -radix signed /pl_goal_compute_axi_tb/dut/track_error_x
-add_wave -radix signed /pl_goal_compute_axi_tb/dut/track_error_y
-add_wave -radix signed /pl_goal_compute_axi_tb/dut/track_pan_step
-add_wave -radix signed /pl_goal_compute_axi_tb/dut/track_tilt_step
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/pan_goal
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/tilt_goal
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/last_pan
-add_wave -radix unsigned /pl_goal_compute_axi_tb/dut/last_tilt
+add_report_wave /pl_goal_compute_axi_tb/dut/track_cx
+add_report_wave /pl_goal_compute_axi_tb/dut/track_cy
+add_report_wave /pl_goal_compute_axi_tb/dut/track_fw
+add_report_wave /pl_goal_compute_axi_tb/dut/track_fh
+add_report_wave /pl_goal_compute_axi_tb/dut/track_error_x
+add_report_wave /pl_goal_compute_axi_tb/dut/track_error_y
+add_report_wave /pl_goal_compute_axi_tb/dut/track_pan_step
+add_report_wave /pl_goal_compute_axi_tb/dut/track_tilt_step
+add_report_wave /pl_goal_compute_axi_tb/dut/pan_goal
+add_report_wave /pl_goal_compute_axi_tb/dut/tilt_goal
+add_report_wave /pl_goal_compute_axi_tb/dut/last_pan
+add_report_wave /pl_goal_compute_axi_tb/dut/last_tilt
 
 run all
-wave zoom full
+catch {wave zoom range 900ns 2600ns}
 
-puts "Done. Check Tcl Console for TB_PASS and capture the waveform window."
+puts "Done. Check Tcl Console for TB_PASS and capture the $wave_name waveform window."

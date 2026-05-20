@@ -50,21 +50,21 @@ Jetson은 무거운 연산과 상위 판단을 담당한다.
 현재 최종 모델은 다음 파일이다.
 
 ```text
-/home/jetson/ultra_yubin_v1/models/drone_best_augmented_0518.engine
+/home/jetson/ultra_yubin_v1/models/drone_best_final_0520.engine
 ```
 
 이 파일은 아래 흐름으로 만든 TensorRT FP16 엔진이다.
 
 ```text
-best_augmented_0518.pt
-  -> drone_best_augmented_0518.onnx
-  -> drone_best_augmented_0518.engine
+best_final_0520.pt
+  -> drone_best_final_0520.onnx
+  -> drone_best_final_0520.engine
 ```
 
 `run_demo_pl_drive.sh` 안에서 기본 모델 경로가 이 엔진으로 고정되어 있다.
 
 ```bash
-YOLO_MODEL_PATH="${ROOT}/models/drone_best_augmented_0518.engine"
+YOLO_MODEL_PATH="${ROOT}/models/drone_best_final_0520.engine"
 ```
 
 ### Ultra96 PS
@@ -207,7 +207,7 @@ run_demo_pl_drive.sh
 ```text
 TRACK_DIRECT_PS=0
 TRACK_PL_SHADOW=0
-YOLO_MODEL_PATH=models/drone_best_augmented_0518.engine
+YOLO_MODEL_PATH=models/drone_best_final_0520.engine
 YOLO_CONF=0.35
 YOLO_FAST_DETECT=1
 TRACK_LEAD_FRAMES=1.0
@@ -349,7 +349,7 @@ bitstream/ultra_yubin_v1.bit
 bitstream/ultra_yubin_v1.hwh
   Ultra96 PL bitstream 및 HWH
 
-models/drone_best_augmented_0518.engine
+models/drone_best_final_0520.engine
   현재 최종 Tello 드론 검출 TensorRT 모델
 ```
 

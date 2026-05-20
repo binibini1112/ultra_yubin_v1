@@ -8,6 +8,7 @@ import argparse
 import json
 import math
 import os
+import subprocess
 import sys
 import time
 from collections import deque
@@ -30,6 +31,7 @@ from src.distance_model import DistanceEstimator, LaserTickEstimator
 from src.core.threat_analyzer import ThreatAnalyzer
 from src.ui.display import AntiDroneDisplay
 from src.utils.jetson_sender import JetsonTelemetrySender
+from src.vision.laser_spot import LaserSpotDetector
 from src.vision.vision_tracker import VisionDetector
 
 
@@ -161,7 +163,64 @@ def parse_args():
                         help="Jetson -> Raspberry Pi telemetry send rate Hz")
     parser.add_argument("--no-jetson-sender", action="store_true",
                         help="Disable Raspberry Pi dashboard UDP telemetry")
+    parser.add_argument("--record-video", default="",
+                        help="Save raw camera video while the normal tracker runs")
+    parser.add_argument("--record-overlay", action="store_true",
+                        help="When used with --record-video, save the UI overlay instead of raw frames")
+    parser.add_argument("--record-fps", type=float, default=float(os.getenv("RECORD_VIDEO_FPS", "30")),
+                        help="FPS written into the saved video file")
+    parser.add_argument("--record-audio", default="",
+                        help="Save ReSpeaker audio as WAV, started together with video recording")
+    parser.add_argument("--record-audio-device", default=os.getenv("RECORD_AUDIO_DEVICE", "plughw:CARD=ArrayUAC10,DEV=0"))
+    parser.add_argument("--record-audio-rate", type=int, default=int(os.getenv("RECORD_AUDIO_RATE", "16000")))
+    parser.add_argument("--record-audio-channels", type=int, default=int(os.getenv("RECORD_AUDIO_CHANNELS", "4")))
     return parser.parse_args()
+
+
+def open_video_writer(path, frame_w, frame_h, fps):
+    if not path:
+        return None
+    out_dir = os.path.dirname(os.path.abspath(path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    ext = os.path.splitext(path)[1].lower()
+    fourcc_name = "mp4v" if ext in (".mp4", ".m4v") else "XVID"
+    writer = cv2.VideoWriter(
+        path,
+        cv2.VideoWriter_fourcc(*fourcc_name),
+        max(1.0, float(fps or config.CAMERA_FPS or 30)),
+        (int(frame_w), int(frame_h)),
+    )
+    if not writer.isOpened():
+        raise RuntimeError(f"failed to open video writer: {path}")
+    print(f"[record] video={path} size={frame_w}x{frame_h} fps={fps:.1f}")
+    return writer
+
+
+def open_audio_recorder(path, device, rate, channels):
+    if not path:
+        return None
+    out_dir = os.path.dirname(os.path.abspath(path))
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    cmd = [
+        "arecord",
+        "-q",
+        "-D",
+        str(device),
+        "-f",
+        "S16_LE",
+        "-r",
+        str(int(rate)),
+        "-c",
+        str(int(channels)),
+        "-t",
+        "wav",
+        path,
+    ]
+    proc = subprocess.Popen(cmd)
+    print(f"[record] audio={path} device={device} rate={rate} channels={channels}")
+    return proc
 
 
 def target_payload(target_box):
@@ -500,6 +559,7 @@ def main():
 
     cam = CameraStream(args.camera).start()
     detector = VisionDetector(args.model)
+    laser_spot_detector = LaserSpotDetector()
     analyzer = ThreatAnalyzer(config.CAMERA_WIDTH, config.CAMERA_HEIGHT)
     distance_estimator = DistanceEstimator(
         config.DISTANCE_MODEL_PATH,
@@ -600,12 +660,27 @@ def main():
     last_audio_detection_time = 0.0
     smooth_target_center = None
     last_raw_target_center = None
+    last_raw_target_frame_idx = None
     last_motor_target_center = None
     lead_velocity = None
     pending_jump_center = None
     lost_since = None
     last_laser_target_seen = 0.0
     laser_status = laser.status()
+    laser_spot = laser_spot_detector.update(None, None)
+    fire_assess_active = False
+    fire_assess_start = 0.0
+    fire_assess_deadline = 0.0
+    fire_assess_id = 0
+    fire_assess_target = None
+    prev_frame_for_diff = None
+    fire_hit_frames = 0
+    fire_sample_frames = 0
+    fire_result = "idle"
+    fire_result_until = 0.0
+    fire_hit_pulse_until = 0.0
+    fire_fired_pulse_until = 0.0
+    laser_fire_debug = os.getenv("LASER_FIRE_DEBUG", "0").strip().lower() in ("1", "true", "yes", "on")
     laser_runtime_cal_enabled = bool(getattr(config, "LASER_RUNTIME_CALIBRATION", False)) and display is not None
     laser_manual_tick = None
     laser_cal_step = max(1, int(getattr(config, "LASER_RUNTIME_CAL_STEP", 4)))
@@ -613,6 +688,8 @@ def main():
     laser_cal_recent = deque(maxlen=20)
     last_laser_aim_sent = 0.0
     last_laser_aim_tick = None
+    laser_spot_correction_tick = 0
+    last_laser_spot_correction = 0.0
     if laser_runtime_cal_enabled:
         if laser_center_lock_enabled:
             print(
@@ -636,6 +713,8 @@ def main():
         max_attempts=config.TELLO_AUDIO_MAX_SEARCH_ATTEMPTS,
         attempt_reset_sec=config.TELLO_AUDIO_ATTEMPT_RESET_SEC,
     )
+    record_writer = None
+    audio_record_proc = None
 
     try:
         while True:
@@ -643,11 +722,21 @@ def main():
             frame = cam.read()
             frame_idx += 1
             frame_h, frame_w = frame.shape[:2]
+            if args.record_video and record_writer is None:
+                record_writer = open_video_writer(args.record_video, frame_w, frame_h, args.record_fps)
+                if args.record_audio:
+                    audio_record_proc = open_audio_recorder(
+                        args.record_audio,
+                        args.record_audio_device,
+                        args.record_audio_rate,
+                        args.record_audio_channels,
+                    )
             camera_center_x = frame_w // 2
             camera_center_y = frame_h // 2
             analyzer.set_frame_size(frame_w, frame_h)
 
             result = detector.track(frame)
+            vision_skipped = bool(getattr(detector, "_last_track_was_skipped", False))
             _visible_ids, target_visible, bboxes = decision.process_tracking(frame, result)
             state.update_vision_status(target_visible)
             audio_detection = None
@@ -658,15 +747,49 @@ def main():
                     target = box
                     break
 
-            laser_should_on = bool(getattr(config, "LASER_ALWAYS_ON", False)) or (
-                bool(getattr(config, "LASER_AUTO_ON_TARGET", True)) and bool(target)
-            )
-            if bool(getattr(config, "LASER_ALWAYS_ON", False)):
-                laser_reason = "always_on"
+            is_diff_eval = False
+            skip_laser_spot_eval = False
+            if fire_assess_active:
+                strobe_phase = fire_sample_frames % 4
+                if strobe_phase == 0:
+                    laser.set_active(True, "fire_strobe")
+                    skip_laser_spot_eval = True
+                elif strobe_phase == 1:
+                    laser.set_active(True, "fire_strobe")
+                    prev_frame_for_diff = frame.copy()
+                    skip_laser_spot_eval = True
+                elif strobe_phase == 2:
+                    laser.set_active(False, "fire_strobe")
+                    skip_laser_spot_eval = True
+                else:
+                    laser.set_active(False, "fire_strobe")
+                    is_diff_eval = True
             else:
-                laser_reason = "bbox" if target else "no_target"
-            laser.set_active(laser_should_on, laser_reason)
+                prev_frame_for_diff = None
+                skip_laser_spot_eval = True
+                laser_should_on = bool(getattr(config, "LASER_ALWAYS_ON", False)) or (
+                    bool(getattr(config, "LASER_AUTO_ON_TARGET", True)) and bool(target)
+                )
+                if bool(getattr(config, "LASER_ALWAYS_ON", False)):
+                    laser_reason = "always_on"
+                else:
+                    laser_reason = "bbox" if target else "no_target"
+                laser.set_active(laser_should_on, laser_reason)
+
+            laser_spot = laser_spot_detector.update(
+                frame,
+                target,
+                prev_frame=prev_frame_for_diff if is_diff_eval else None,
+                skip_eval=skip_laser_spot_eval,
+            )
             laser_status = laser.status()
+            laser_status.update({
+                "laser_dot": laser_spot,
+                "hit_detected": False,
+                "laser_hit_detected": False,
+                "laser_spot_hit_detected": bool(laser_spot.get("hit_detected", False)),
+                "fire_bbox": None,
+            })
 
             if target and config.TRACK_VISION_MOTOR_ENABLE:
                 lost_since = None
@@ -677,14 +800,24 @@ def main():
                 raw_cy = int((y1 + y2) / 2)
                 raw_target_center = (raw_cx, raw_cy)
                 previous_raw_target_center = last_raw_target_center
-                if previous_raw_target_center is None:
+                previous_raw_target_frame_idx = last_raw_target_frame_idx
+                if vision_skipped or previous_raw_target_center is None:
                     target_jump_px = 0.0
                 else:
                     target_jump_px = math.hypot(
                         raw_target_center[0] - previous_raw_target_center[0],
                         raw_target_center[1] - previous_raw_target_center[1],
                     )
-                last_raw_target_center = raw_target_center
+                infer_frame_delta = 1
+                if previous_raw_target_frame_idx is not None:
+                    infer_frame_delta = max(1, frame_idx - previous_raw_target_frame_idx)
+                skipped_since_infer = (
+                    0 if previous_raw_target_frame_idx is None
+                    else max(0, frame_idx - previous_raw_target_frame_idx)
+                )
+                if not vision_skipped:
+                    last_raw_target_center = raw_target_center
+                    last_raw_target_frame_idx = frame_idx
                 bw = int(x2 - x1)
                 bh = int(y2 - y1)
                 distance_mm = distance_estimator.estimate(bw, bh)
@@ -710,6 +843,40 @@ def main():
                             laser_goal_tick = laser_base_tick
                         else:
                             laser_goal_tick = laser_goal_for_bbox(laser_base_tick, raw_cy, frame_h)
+                laser_spot_delta_tick = 0
+                if (
+                    bool(getattr(config, "LASER_SPOT_CLOSED_LOOP", True))
+                    and laser_goal_tick is not None
+                    and laser_spot.get("detected")
+                ):
+                    now_spot = time.perf_counter()
+                    period = float(getattr(config, "LASER_SPOT_CORRECTION_PERIOD_SEC", 0.08))
+                    if now_spot - last_laser_spot_correction >= period:
+                        dot_y = int(laser_spot.get("y"))
+                        edge_margin_px = max(0, int(getattr(config, "LASER_SPOT_EDGE_MARGIN_PX", 8)))
+                        step = max(1, int(getattr(config, "LASER_SPOT_TICK_STEP", 2)))
+                        big_step = max(step, int(getattr(config, "LASER_SPOT_TICK_BIG_STEP", 6)))
+                        big_error_px = max(1, int(getattr(config, "LASER_SPOT_BIG_ERROR_PX", 30)))
+                        sign = int(getattr(config, "LASER_SPOT_CLOSED_LOOP_SIGN", 1)) or 1
+                        if dot_y < y1 + edge_margin_px:
+                            error_px = int((y1 + edge_margin_px) - dot_y)
+                            laser_spot_delta_tick = sign * (big_step if error_px >= big_error_px else step)
+                        elif dot_y > y2 - edge_margin_px:
+                            error_px = int(dot_y - (y2 - edge_margin_px))
+                            laser_spot_delta_tick = -sign * (big_step if error_px >= big_error_px else step)
+                        if laser_spot_delta_tick:
+                            correction_limit = max(0, int(getattr(config, "LASER_SPOT_CORRECTION_LIMIT_TICK", 120)))
+                            laser_spot_correction_tick = max(
+                                -correction_limit,
+                                min(correction_limit, laser_spot_correction_tick + laser_spot_delta_tick),
+                            )
+                            last_laser_spot_correction = now_spot
+                if laser_goal_tick is not None and laser_spot_correction_tick:
+                    laser_goal_tick = clamp_tick(laser_goal_tick + laser_spot_correction_tick)
+                laser_spot.update({
+                    "correction_tick": int(laser_spot_correction_tick),
+                    "correction_delta_tick": int(laser_spot_delta_tick),
+                })
                 threat_info = analyzer.update(target["box"])
                 conf = float(target.get("conf", 0.0))
                 held = bool(target.get("held", False))
@@ -731,22 +898,25 @@ def main():
                     and not held
                     and conf >= lead_min_conf
                 ):
-                    inst_vx = float(raw_cx - previous_raw_target_center[0])
-                    inst_vy = float(raw_cy - previous_raw_target_center[1])
-                    lead_alpha = max(0.0, min(1.0, float(getattr(config, "TRACK_LEAD_VELOCITY_ALPHA", 0.55))))
-                    reset_jump_px = float(getattr(config, "TRACK_LEAD_RESET_JUMP_PX", 240.0))
-                    if lead_velocity is None or target_jump_px > reset_jump_px:
-                        lead_velocity = (inst_vx, inst_vy)
-                    else:
-                        lead_velocity = (
-                            lead_velocity[0] + (inst_vx - lead_velocity[0]) * lead_alpha,
-                            lead_velocity[1] + (inst_vy - lead_velocity[1]) * lead_alpha,
-                        )
-                    max_lead_px = max(0.0, float(getattr(config, "TRACK_LEAD_MAX_PX", 80.0)))
-                    lead_dx = max(-max_lead_px, min(max_lead_px, lead_velocity[0] * lead_frames))
-                    lead_dy = max(-max_lead_px, min(max_lead_px, lead_velocity[1] * lead_frames))
-                    motor_raw_cx = max(0, min(frame_w, int(round(raw_cx + lead_dx))))
-                    motor_raw_cy = max(0, min(frame_h, int(round(raw_cy + lead_dy))))
+                    if not vision_skipped:
+                        inst_vx = float(raw_cx - previous_raw_target_center[0]) / float(infer_frame_delta)
+                        inst_vy = float(raw_cy - previous_raw_target_center[1]) / float(infer_frame_delta)
+                        lead_alpha = max(0.0, min(1.0, float(getattr(config, "TRACK_LEAD_VELOCITY_ALPHA", 0.55))))
+                        reset_jump_px = float(getattr(config, "TRACK_LEAD_RESET_JUMP_PX", 240.0))
+                        if lead_velocity is None or target_jump_px > reset_jump_px:
+                            lead_velocity = (inst_vx, inst_vy)
+                        else:
+                            lead_velocity = (
+                                lead_velocity[0] + (inst_vx - lead_velocity[0]) * lead_alpha,
+                                lead_velocity[1] + (inst_vy - lead_velocity[1]) * lead_alpha,
+                            )
+                    if lead_velocity is not None:
+                        max_lead_px = max(0.0, float(getattr(config, "TRACK_LEAD_MAX_PX", 80.0)))
+                        predict_frames = lead_frames + (float(skipped_since_infer) if vision_skipped else 0.0)
+                        lead_dx = max(-max_lead_px, min(max_lead_px, lead_velocity[0] * predict_frames))
+                        lead_dy = max(-max_lead_px, min(max_lead_px, lead_velocity[1] * predict_frames))
+                        motor_raw_cx = max(0, min(frame_w, int(round(raw_cx + lead_dx))))
+                        motor_raw_cy = max(0, min(frame_h, int(round(raw_cy + lead_dy))))
                 elif target_jump_px > float(getattr(config, "TRACK_LEAD_RESET_JUMP_PX", 240.0)):
                     lead_velocity = None
                 raw_err_x = motor_raw_cx - aim_x
@@ -868,6 +1038,11 @@ def main():
                     (motor_min_w > 0 and bw < motor_min_w) or
                     (motor_min_h > 0 and bh < motor_min_h)
                 )
+                laser_center_lock_control_tick = active_laser_center_lock_tick
+                if laser_center_lock_enabled and laser_spot_correction_tick:
+                    laser_center_lock_control_tick = clamp_tick(
+                        active_laser_center_lock_tick + laser_spot_correction_tick
+                    )
                 held_motor_ok = held and bool(getattr(config, "TRACK_MOTOR_USE_HELD", True))
                 if center_locked:
                     last_telemetry = motor_skip_telemetry(
@@ -904,14 +1079,14 @@ def main():
                         bh,
                         distance_mm=distance_mm,
                         laser_base_tick=laser_base_tick,
-                        laser_center_lock_tick=active_laser_center_lock_tick if laser_center_lock_enabled else None,
+                        laser_center_lock_tick=laser_center_lock_control_tick if laser_center_lock_enabled else None,
                         aim_center_x=camera_center_x,
                         aim_center_y=camera_center_y,
                     )
                 last_telemetry.update({
                     "distance_mm": distance_mm,
                     "laser_range_offset_tick": range_laser_offset_tick,
-                    "laser_center_lock_tick": active_laser_center_lock_tick if laser_center_lock_enabled else None,
+                    "laser_center_lock_tick": laser_center_lock_control_tick if laser_center_lock_enabled else None,
                 })
                 telemetry_cmd = str(last_telemetry.get("tx_cmd", ""))
                 if telemetry_cmd.startswith("T "):
@@ -938,7 +1113,7 @@ def main():
                         last_telemetry.update({
                             "distance_mm": distance_mm,
                             "laser_range_offset_tick": range_laser_offset_tick,
-                            "laser_center_lock_tick": active_laser_center_lock_tick if laser_center_lock_enabled else None,
+                            "laser_center_lock_tick": laser_center_lock_control_tick if laser_center_lock_enabled else None,
                         })
                         last_laser_aim_sent = now_laser_aim
                         last_laser_aim_tick = goal
@@ -1146,6 +1321,84 @@ def main():
                 else:
                     event = "no_target"
 
+            fire_telemetry_force = False
+            now_fire = time.perf_counter()
+            fire_window_sec = max(0.1, float(getattr(config, "FIRE_ASSESS_WINDOW_SEC", 1.0)))
+            fire_min_hits = max(1, int(getattr(config, "FIRE_HIT_MIN_FRAMES", 3)))
+            if fire_assess_active:
+                fire_sample_frames += 1
+                fire_sample_is_hit = (
+                    is_diff_eval
+                    and bool(laser_spot.get("detected", False))
+                    and bool(laser_spot.get("inside_hit_bbox", False))
+                )
+                if laser_fire_debug and is_diff_eval:
+                    print(
+                        "[FIRE-CHECK] "
+                        f"id={fire_assess_id} "
+                        f"det={int(bool(laser_spot.get('detected', False)))} "
+                        f"in_bbox={int(bool(laser_spot.get('inside_bbox', False)))} "
+                        f"in_hit={int(bool(laser_spot.get('inside_hit_bbox', False)))} "
+                        f"x={laser_spot.get('x')} y={laser_spot.get('y')} "
+                        f"area={laser_spot.get('area')} score={laser_spot.get('score')} "
+                        f"bbox={laser_spot.get('bbox')} hit_box={laser_spot.get('hit_bbox')} "
+                        f"hits={fire_hit_frames}/{fire_sample_frames}"
+                    )
+                if fire_sample_is_hit:
+                    fire_hit_frames += 1
+                if fire_hit_frames >= fire_min_hits:
+                    fire_assess_active = False
+                    fire_result = "hit"
+                    fire_hit_pulse_until = now_fire + max(0.05, float(getattr(config, "FIRE_HIT_PULSE_SEC", 0.35)))
+                    fire_result_until = now_fire + max(0.1, float(getattr(config, "FIRE_RESULT_DISPLAY_SEC", 1.0)))
+                    fire_telemetry_force = True
+                    print(
+                        f"[FIRE] HIT id={fire_assess_id} "
+                        f"hits={fire_hit_frames}/{fire_sample_frames} "
+                        f"elapsed={now_fire - fire_assess_start:.3f}s"
+                    )
+                elif now_fire >= fire_assess_deadline:
+                    fire_assess_active = False
+                    fire_result = "miss"
+                    fire_result_until = now_fire + max(0.1, float(getattr(config, "FIRE_RESULT_DISPLAY_SEC", 1.0)))
+                    fire_telemetry_force = True
+                    print(
+                        f"[FIRE] MISS id={fire_assess_id} "
+                        f"hits={fire_hit_frames}/{fire_sample_frames} "
+                        f"elapsed={now_fire - fire_assess_start:.3f}s"
+                    )
+            elif fire_result not in ("idle", "") and now_fire >= fire_result_until and now_fire >= fire_hit_pulse_until:
+                fire_result = "idle"
+
+            fire_hit_detected = bool(now_fire < fire_hit_pulse_until)
+            fire_fired_event = bool(now_fire < fire_fired_pulse_until)
+            laser_status.update({
+                "laser_dot": laser_spot,
+                "hit_detected": fire_hit_detected,
+                "laser_hit_detected": fire_hit_detected,
+                "laser_spot_hit_detected": bool(laser_spot.get("hit_detected", False)),
+                "fired": fire_fired_event,
+                "shot_count": int(fire_assess_id),
+                "fire_active": bool(fire_assess_active),
+                "fire_result": fire_result,
+                "fire_id": int(fire_assess_id),
+                "fire_hit_frames": int(fire_hit_frames),
+                "fire_sample_frames": int(fire_sample_frames),
+                "fire_window_sec": float(fire_window_sec),
+                "fire_elapsed_sec": float(max(0.0, now_fire - fire_assess_start)) if fire_assess_start else 0.0,
+            })
+            last_telemetry.update({
+                "hit_detected": fire_hit_detected,
+                "laser_spot_hit_detected": bool(laser_spot.get("hit_detected", False)),
+                "fired": fire_fired_event,
+                "shot_count": int(fire_assess_id),
+                "fire_active": bool(fire_assess_active),
+                "fire_result": fire_result,
+                "fire_id": int(fire_assess_id),
+                "fire_hit_frames": int(fire_hit_frames),
+                "fire_sample_frames": int(fire_sample_frames),
+            })
+
             decision.update_engagement_state(target_visible, threat_info)
             if target_visible and state.system_state == SystemState.DETECTED:
                 state.transition(SystemState.TRACKING)
@@ -1171,16 +1424,21 @@ def main():
                 audio_info=audio_info,
                 laser_info={
                     "armed": bool(laser_status.get("laser_output", False)),
-                    "hit_detected": bool(
-                        laser_status.get(
-                            "hit_detected",
-                            laser_status.get("laser_hit_detected", False),
-                        )
-                    ),
+                    "fired": fire_fired_event,
+                    "shot_count": int(fire_assess_id),
+                    "hit_detected": fire_hit_detected,
+                    "laser_dot": laser_spot,
+                    "fire_active": bool(fire_assess_active),
+                    "fire_result": fire_result,
+                    "fire_id": int(fire_assess_id),
+                    "fire_hit_frames": int(fire_hit_frames),
+                    "fire_sample_frames": int(fire_sample_frames),
+                    "fire_window_sec": float(fire_window_sec),
                 },
                 pan_min=config.PAN_MIN,
                 pan_max=config.PAN_MAX,
                 pan_dir=config.PAN_DIR,
+                force=fire_telemetry_force or fire_fired_event,
             )
             pipeline.write(
                 frame_idx,
@@ -1195,6 +1453,17 @@ def main():
                     "loop_ms": (time.perf_counter() - loop_started) * 1000.0,
                     "model": detector._model_name,
                     "skipped": detector._last_track_was_skipped,
+                    "laser_dot": laser_spot,
+                    "hit_detected": fire_hit_detected,
+                    "laser_spot_hit_detected": bool(laser_spot.get("hit_detected", False)),
+                    "fire": {
+                        "active": bool(fire_assess_active),
+                        "result": fire_result,
+                        "id": int(fire_assess_id),
+                        "hit_frames": int(fire_hit_frames),
+                        "sample_frames": int(fire_sample_frames),
+                        "window_sec": float(fire_window_sec),
+                    },
                     "camera": {
                         "width": frame_w,
                         "height": frame_h,
@@ -1204,6 +1473,9 @@ def main():
                     "audio": audio_detection or {},
                 },
             )
+
+            if record_writer is not None and not args.record_overlay:
+                record_writer.write(frame)
 
             if display:
                 fps = 0.0
@@ -1219,10 +1491,34 @@ def main():
                     fire_status=laser_status,
                     motor_info=last_telemetry,
                 )
+                if record_writer is not None and args.record_overlay:
+                    record_writer.write(frame)
                 key = cv2.waitKeyEx(1) & 0xFFFFFFFF
                 clicked = display.get_clicked_button()
                 if key in (27, ord("q"), ord("Q")) or clicked == "RESET":
                     break
+                if key in (ord("f"), ord("F")):
+                    fire_assess_id += 1
+                    fire_assess_active = True
+                    fire_assess_start = time.perf_counter()
+                    fire_assess_deadline = fire_assess_start + max(
+                        0.1,
+                        float(getattr(config, "FIRE_ASSESS_WINDOW_SEC", 1.0)),
+                    )
+                    fire_hit_frames = 0
+                    fire_sample_frames = 0
+                    prev_frame_for_diff = None
+                    fire_result = "assessing"
+                    fire_result_until = fire_assess_deadline
+                    fire_hit_pulse_until = 0.0
+                    fire_fired_pulse_until = fire_assess_start + 0.25
+                    print(
+                        f"[FIRE] START id={fire_assess_id} "
+                        f"window={getattr(config, 'FIRE_ASSESS_WINDOW_SEC', 1.0)}s "
+                        f"min_hits={getattr(config, 'FIRE_HIT_MIN_FRAMES', 3)} "
+                        f"bbox={target.get('box') if target else None}"
+                    )
+                    continue
                 if (
                     key == ord(" ")
                     and bool(getattr(config, "LASER_PATTERN_ON_SPACE", True))
@@ -1304,6 +1600,17 @@ def main():
             audio.stop()
         motor.stop()
         jetson_sender.close()
+        if record_writer is not None:
+            record_writer.release()
+        if audio_record_proc is not None:
+            try:
+                audio_record_proc.send_signal(2)
+                audio_record_proc.wait(timeout=2.0)
+            except Exception:
+                try:
+                    audio_record_proc.terminate()
+                except Exception:
+                    pass
         if display:
             try:
                 cv2.destroyAllWindows()

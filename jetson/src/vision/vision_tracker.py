@@ -60,10 +60,8 @@ class VisionDetector:
         _project = os.path.dirname(os.path.dirname(os.path.dirname(
             os.path.abspath(__file__))))  # antidrone_yubin/
         default_candidates = [
-            os.path.join(_project, "models", "drone_yolov8s_fromjunmo.engine"),
-            os.path.join(_project, "models", "drone_yolov8s_fromjunmo.pt"),
-            os.path.join(_project, "models", "tello_yolo.engine"),
-            os.path.join(_project, "models", "tello_yolo.pt"),
+            os.path.join(_project, "models", "drone_best_final_0520.engine"),
+            os.path.join(_project, "models", "drone_best_final_0520.pt"),
         ]
         candidates = []
         if engine_path:

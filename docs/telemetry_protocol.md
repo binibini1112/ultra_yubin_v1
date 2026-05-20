@@ -91,11 +91,22 @@ Allowed `state` values:
   },
   "laser": {
     "armed": false,
+    "fired": false,
+    "shot_count": 0,
     "hit_detected": false
   },
   "state": "TRACKING"
 }
 ```
+
+## Shot Count
+
+The dashboard counts shots only when Jetson reports a fire action:
+
+- Preferred: increment `laser.shot_count` every time the Jetson fire key/action runs.
+- Alternative: send `laser.fired=true` for the fire event, then return it to `false`.
+
+`laser.armed=true` does not increase shots. `laser.hit_detected=true` increases hits, not shots.
 
 ## Hit Response
 

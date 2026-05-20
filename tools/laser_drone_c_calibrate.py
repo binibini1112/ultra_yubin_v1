@@ -227,7 +227,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", default=DEFAULT_OUTPUT)
     parser.add_argument("--camera", default="auto")
-    parser.add_argument("--model", default=os.path.join(ROOT, "models", "drone_yolov8s_fromjunmo.engine"))
+    parser.add_argument("--model", default=os.path.join(ROOT, "models", "drone_best_final_0520.engine"))
     parser.add_argument("--window", type=int, default=20)
     parser.add_argument("--conf", type=float, default=float(os.getenv("YOLO_CONF", "0.60")))
     parser.add_argument("--imgsz", type=int, default=int(os.getenv("YOLO_IMGSZ", "640")))

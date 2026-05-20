@@ -123,12 +123,13 @@ class JetsonTelemetrySender:
         pan_min=0,
         pan_max=4095,
         pan_dir=1,
+        force=False,
     ):
         if not self.enabled or self._sock is None:
             return False
 
         now = time.time()
-        if now - self._last_send < self.min_interval:
+        if not force and now - self._last_send < self.min_interval:
             return False
 
         payload = self._build_payload(
@@ -273,8 +274,31 @@ class JetsonTelemetrySender:
 
         laser = {
             "armed": bool((laser_info or {}).get("armed", False)),
+            "fired": bool((laser_info or {}).get("fired", False)),
+            "shot_count": int(_as_number((laser_info or {}).get("shot_count"), default=0, cast=int)),
             "hit_detected": bool((laser_info or {}).get("hit_detected", False)),
         }
+        laser_dot = (laser_info or {}).get("laser_dot")
+        if isinstance(laser_dot, dict):
+            laser["dot"] = {
+                "detected": bool(laser_dot.get("detected", False)),
+                "x": _as_number(laser_dot.get("x"), cast=int),
+                "y": _as_number(laser_dot.get("y"), cast=int),
+                "score": _as_number(laser_dot.get("score"), default=0.0),
+                "area": _as_number(laser_dot.get("area"), default=0, cast=int),
+                "inside_bbox": bool(laser_dot.get("inside_bbox", False)),
+                "hit_count": _as_number(laser_dot.get("hit_count"), default=0, cast=int),
+                "hit_window": _as_number(laser_dot.get("hit_window"), default=0, cast=int),
+            }
+        if laser_info:
+            laser["fire"] = {
+                "active": bool(laser_info.get("fire_active", False)),
+                "result": str(laser_info.get("fire_result", "idle")),
+                "id": _as_number(laser_info.get("fire_id"), default=0, cast=int),
+                "hit_frames": _as_number(laser_info.get("fire_hit_frames"), default=0, cast=int),
+                "sample_frames": _as_number(laser_info.get("fire_sample_frames"), default=0, cast=int),
+                "window_sec": _as_number(laser_info.get("fire_window_sec"), default=0.0),
+            }
         payload["laser"] = laser
 
         return payload

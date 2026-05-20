@@ -1,3 +1,10 @@
+# 최종 실행 코드
+
+```bash
+cd /home/jetson/ultra_yubin_v1
+./run_demo_pl_drive.sh
+```
+
 # ultra_yubin
 
 Jetson YOLO/Audio -> Ultra96 PS -> Ultra96 PL bbox goal compute -> Ultra96 PS USB/U2D2 -> Dynamixel 구조만 남긴 최소 프로젝트입니다.
@@ -12,8 +19,8 @@ Jetson YOLO/Audio -> Ultra96 PS -> Ultra96 PL bbox goal compute -> Ultra96 PS US
 
 ## 포함한 모델
 
-- `models/tello_yolo.engine`: Junmo/Junyoung DJI Tello detector TensorRT 모델
-- `models/tello_yolo.pt`: DJI Tello detector fallback
+- `models/drone_best_final_0520.engine`: DJI Tello detector TensorRT 모델
+- `models/drone_best_final_0520.pt`: DJI Tello detector fallback
 - `models/tello_audio_config.json`: Tello audio model config
 - `models/tello_detector.keras`: Keras 원본
 - `models/tello_detector.tflite`: Jetson 런타임용 TFLite 모델
@@ -42,7 +49,7 @@ Jetson에서 YOLO bbox를 Ultra96로 보내려면:
 
 ```bash
 cd /home/jetson/ultra_yubin
-python3 jetson/jetson_node.py --camera 0 --model models/tello_yolo.engine
+python3 jetson/jetson_node.py --camera 0 --model models/drone_best_final_0520.engine
 ```
 
 YOLO 미검출 시 ReSpeaker 오디오 fallback까지 켜려면:

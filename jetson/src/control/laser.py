@@ -1,5 +1,6 @@
 import threading
 import time
+import os
 import sys
 
 _GPIO_AVAILABLE = False
@@ -37,6 +38,7 @@ class LaserController:
         self._timer = None
         self._pattern_thread = None
         self._lock = threading.Lock()
+        self.verbose = os.getenv("LASER_VERBOSE", "0").strip().lower() in ("1", "true", "yes", "on")
 
         if self.enabled:
             try:
@@ -96,7 +98,8 @@ class LaserController:
                 return
             self.active = active
             self._write_gpio_locked(active)
-        print(f"[LASER] {'ON' if active else 'OFF'} ({reason})")
+        if self.verbose:
+            print(f"[LASER] {'ON' if active else 'OFF'} ({reason})")
 
     def pattern(self, bits="110111", unit_sec=0.12, gap_sec=0.04, reason="manual-pattern"):
         bits = "".join(ch for ch in str(bits or "") if ch in "01")

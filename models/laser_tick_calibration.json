@@ -1,0 +1,397 @@
+{
+  "type": "distance_to_laser_tick",
+  "samples": [
+    {
+      "distance_m": 0.25,
+      "distance_mm": 250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1904,
+      "timestamp": "2026-05-16T16:43:55+0900"
+    },
+    {
+      "distance_m": 0.25,
+      "distance_mm": 250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1920,
+      "timestamp": "2026-05-16T16:43:59+0900"
+    },
+    {
+      "distance_m": 0.25,
+      "distance_mm": 250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1920,
+      "timestamp": "2026-05-16T16:43:59+0900"
+    },
+    {
+      "distance_m": 0.25,
+      "distance_mm": 250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1920,
+      "timestamp": "2026-05-16T16:44:00+0900"
+    },
+    {
+      "distance_m": 0.25,
+      "distance_mm": 250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1920,
+      "timestamp": "2026-05-16T16:44:00+0900"
+    },
+    {
+      "distance_m": 0.5,
+      "distance_mm": 500,
+      "laser_id": 3,
+      "laser_tilt_tick": 1952,
+      "timestamp": "2026-05-16T16:45:05+0900"
+    },
+    {
+      "distance_m": 0.5,
+      "distance_mm": 500,
+      "laser_id": 3,
+      "laser_tilt_tick": 1952,
+      "timestamp": "2026-05-16T16:45:05+0900"
+    },
+    {
+      "distance_m": 0.5,
+      "distance_mm": 500,
+      "laser_id": 3,
+      "laser_tilt_tick": 1952,
+      "timestamp": "2026-05-16T16:45:06+0900"
+    },
+    {
+      "distance_m": 0.5,
+      "distance_mm": 500,
+      "laser_id": 3,
+      "laser_tilt_tick": 1952,
+      "timestamp": "2026-05-16T16:45:06+0900"
+    },
+    {
+      "distance_m": 0.75,
+      "distance_mm": 750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1978,
+      "timestamp": "2026-05-16T16:46:53+0900"
+    },
+    {
+      "distance_m": 0.75,
+      "distance_mm": 750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1978,
+      "timestamp": "2026-05-16T16:46:54+0900"
+    },
+    {
+      "distance_m": 0.75,
+      "distance_mm": 750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1978,
+      "timestamp": "2026-05-16T16:46:54+0900"
+    },
+    {
+      "distance_m": 0.75,
+      "distance_mm": 750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1978,
+      "timestamp": "2026-05-16T16:46:55+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 1985,
+      "timestamp": "2026-05-16T16:48:53+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 1985,
+      "timestamp": "2026-05-16T16:48:53+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 1985,
+      "timestamp": "2026-05-16T16:48:53+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 1985,
+      "timestamp": "2026-05-16T16:48:54+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:35+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:36+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:36+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:36+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:36+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:37+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:39+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:40+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2082,
+      "timestamp": "2026-05-16T16:38:40+0900"
+    },
+    {
+      "distance_m": 1.25,
+      "distance_mm": 1250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1992,
+      "timestamp": "2026-05-16T16:50:09+0900"
+    },
+    {
+      "distance_m": 1.25,
+      "distance_mm": 1250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1992,
+      "timestamp": "2026-05-16T16:50:09+0900"
+    },
+    {
+      "distance_m": 1.25,
+      "distance_mm": 1250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1992,
+      "timestamp": "2026-05-16T16:50:09+0900"
+    },
+    {
+      "distance_m": 1.25,
+      "distance_mm": 1250,
+      "laser_id": 3,
+      "laser_tilt_tick": 1992,
+      "timestamp": "2026-05-16T16:50:10+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:51:56+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:51:57+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:51:57+0900"
+    },
+    {
+      "distance_m": 1.75,
+      "distance_mm": 1750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1989,
+      "timestamp": "2026-05-16T16:52:23+0900"
+    },
+    {
+      "distance_m": 1.75,
+      "distance_mm": 1750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1989,
+      "timestamp": "2026-05-16T16:52:23+0900"
+    },
+    {
+      "distance_m": 1.75,
+      "distance_mm": 1750,
+      "laser_id": 3,
+      "laser_tilt_tick": 1989,
+      "timestamp": "2026-05-16T16:52:23+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:53:15+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:53:16+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:53:16+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:53:16+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2000,
+      "timestamp": "2026-05-16T16:53:16+0900"
+    },
+    {
+      "distance_m": 2.25,
+      "distance_mm": 2250,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:53:56+0900"
+    },
+    {
+      "distance_m": 2.25,
+      "distance_mm": 2250,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:53:56+0900"
+    },
+    {
+      "distance_m": 2.25,
+      "distance_mm": 2250,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:53:56+0900"
+    },
+    {
+      "distance_m": 2.25,
+      "distance_mm": 2250,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:53:57+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:54:27+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:54:28+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "laser_id": 3,
+      "laser_tilt_tick": 2002,
+      "timestamp": "2026-05-16T16:54:28+0900"
+    },
+    {
+      "distance_m": 2.75,
+      "distance_mm": 2750,
+      "laser_id": 3,
+      "laser_tilt_tick": 2006,
+      "timestamp": "2026-05-16T16:55:14+0900"
+    },
+    {
+      "distance_m": 2.75,
+      "distance_mm": 2750,
+      "laser_id": 3,
+      "laser_tilt_tick": 2006,
+      "timestamp": "2026-05-16T16:55:16+0900"
+    },
+    {
+      "distance_m": 2.75,
+      "distance_mm": 2750,
+      "laser_id": 3,
+      "laser_tilt_tick": 2006,
+      "timestamp": "2026-05-16T16:55:16+0900"
+    },
+    {
+      "distance_m": 2.75,
+      "distance_mm": 2750,
+      "laser_id": 3,
+      "laser_tilt_tick": 2006,
+      "timestamp": "2026-05-16T16:55:17+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2004,
+      "timestamp": "2026-05-16T16:57:52+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2004,
+      "timestamp": "2026-05-16T16:57:53+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2004,
+      "timestamp": "2026-05-16T16:57:53+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "laser_id": 3,
+      "laser_tilt_tick": 2004,
+      "timestamp": "2026-05-16T16:57:53+0900"
+    }
+  ]
+}

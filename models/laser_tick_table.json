@@ -1,0 +1,42 @@
+{
+  "type": "distance_to_laser_tick_runtime_table",
+  "created_at": "2026-05-16T17:05:00+0900",
+  "source": "models/laser_tick_calibration.json",
+  "laser_id": 3,
+  "pan_hold_tick": 2048,
+  "tilt_hold_tick": 2952,
+  "notes": [
+    "Runtime table uses measured samples compressed by distance.",
+    "Old 1.0m samples at tick 2082 were excluded as pre-final-tilt outliers.",
+    "1.75m raw median was below neighboring distances, so runtime table is monotonic-smoothed.",
+    "Use interpolation between points."
+  ],
+  "raw_summary": [
+    {"distance_mm": 250, "samples": [1904, 1920, 1920, 1920, 1920], "median_tick": 1920},
+    {"distance_mm": 500, "samples": [1952, 1952, 1952, 1952], "median_tick": 1952},
+    {"distance_mm": 750, "samples": [1978, 1978, 1978, 1978], "median_tick": 1978},
+    {"distance_mm": 1000, "samples_used": [1985, 1985, 1985, 1985], "samples_excluded": [2082, 2082, 2082, 2082, 2082, 2082, 2082, 2082, 2082], "median_tick": 1985},
+    {"distance_mm": 1250, "samples": [1992, 1992, 1992, 1992], "median_tick": 1992},
+    {"distance_mm": 1500, "samples": [2000, 2000, 2000], "median_tick": 2000},
+    {"distance_mm": 1750, "samples": [1989, 1989, 1989], "median_tick": 1989},
+    {"distance_mm": 2000, "samples": [2000, 2000, 2000, 2000, 2000], "median_tick": 2000},
+    {"distance_mm": 2250, "samples": [2002, 2002, 2002, 2002], "median_tick": 2002},
+    {"distance_mm": 2500, "samples": [2002, 2002, 2002], "median_tick": 2002},
+    {"distance_mm": 2750, "samples": [2006, 2006, 2006, 2006], "median_tick": 2006},
+    {"distance_mm": 3000, "samples": [2004, 2004, 2004, 2004], "median_tick": 2004}
+  ],
+  "table": [
+    [250, 1920],
+    [500, 1952],
+    [750, 1978],
+    [1000, 1985],
+    [1250, 1992],
+    [1500, 2000],
+    [1750, 2000],
+    [2000, 2000],
+    [2250, 2002],
+    [2500, 2002],
+    [2750, 2006],
+    [3000, 2006]
+  ]
+}

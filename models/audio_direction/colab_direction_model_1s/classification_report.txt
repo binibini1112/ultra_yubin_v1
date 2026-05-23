@@ -1,0 +1,12 @@
+              precision    recall  f1-score   support
+
+        0deg       0.97      0.97      0.97        30
+       60deg       1.00      1.00      1.00       180
+      120deg       0.97      1.00      0.98        30
+      180deg       1.00      1.00      1.00       180
+      240deg       1.00      1.00      1.00        30
+      300deg       0.97      0.93      0.95        30
+
+    accuracy                           0.99       480
+   macro avg       0.98      0.98      0.98       480
+weighted avg       0.99      0.99      0.99       480

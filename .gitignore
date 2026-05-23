@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.venv/
+benchmark_logs/*.log
+benchmark_logs/*.jsonl
+benchmark_logs/
+recordings/
+pl_goal_compute_axi_tb.pass
+*.tmp
+*.bak
+스크린샷*.png
+best_final_0520.pt

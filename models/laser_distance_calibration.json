@@ -1,0 +1,505 @@
+{
+  "type": "bbox_height_to_distance",
+  "samples": [
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "bbox_h": 42.38,
+      "bbox_w": 132.47,
+      "bbox_area": 5614.22,
+      "confidence": 0.8248,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:05+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "bbox_h": 42.35,
+      "bbox_w": 132.62,
+      "bbox_area": 5616.27,
+      "confidence": 0.8316,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:05+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "bbox_h": 42.2,
+      "bbox_w": 132.38,
+      "bbox_area": 5586.44,
+      "confidence": 0.8438,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:05+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "bbox_h": 41.36,
+      "bbox_w": 132.26,
+      "bbox_area": 5469.88,
+      "confidence": 0.8244,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:04+0900"
+    },
+    {
+      "distance_m": 1.0,
+      "distance_mm": 1000,
+      "bbox_h": 40.08,
+      "bbox_w": 131.36,
+      "bbox_area": 5265.66,
+      "confidence": 0.8342,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:04+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 45.29,
+      "bbox_w": 75.3,
+      "bbox_area": 3408.35,
+      "confidence": 0.793,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:01+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 44.68,
+      "bbox_w": 74.69,
+      "bbox_area": 3337.42,
+      "confidence": 0.8192,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:00+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 43.54,
+      "bbox_w": 76.04,
+      "bbox_area": 3309.08,
+      "confidence": 0.8315,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:59+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 42.56,
+      "bbox_w": 77.23,
+      "bbox_area": 3286.97,
+      "confidence": 0.8207,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:59+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 41.43,
+      "bbox_w": 78.25,
+      "bbox_area": 3241.02,
+      "confidence": 0.8064,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:58+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 38.99,
+      "bbox_w": 78.54,
+      "bbox_area": 3059.61,
+      "confidence": 0.8204,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:02+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 32.26,
+      "bbox_w": 80.58,
+      "bbox_area": 2599.27,
+      "confidence": 0.7385,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:02+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 30.94,
+      "bbox_w": 82.05,
+      "bbox_area": 2540.37,
+      "confidence": 0.7573,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:03+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 29.74,
+      "bbox_w": 72.0,
+      "bbox_area": 2141.92,
+      "confidence": 0.4986,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:09+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 29.62,
+      "bbox_w": 80.48,
+      "bbox_area": 2383.11,
+      "confidence": 0.7701,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:55+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 29.34,
+      "bbox_w": 81.57,
+      "bbox_area": 2393.67,
+      "confidence": 0.7002,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:17:54+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 29.24,
+      "bbox_w": 81.95,
+      "bbox_area": 2397.76,
+      "confidence": 0.7749,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:04+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 28.82,
+      "bbox_w": 74.64,
+      "bbox_area": 2153.79,
+      "confidence": 0.4837,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:07+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 28.54,
+      "bbox_w": 75.54,
+      "bbox_area": 2156.93,
+      "confidence": 0.4996,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:07+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 27.81,
+      "bbox_w": 75.31,
+      "bbox_area": 2094.85,
+      "confidence": 0.5197,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:06+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 27.09,
+      "bbox_w": 79.95,
+      "bbox_area": 2170.43,
+      "confidence": 0.7054,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:04+0900"
+    },
+    {
+      "distance_m": 1.5,
+      "distance_mm": 1500,
+      "bbox_h": 26.44,
+      "bbox_w": 76.53,
+      "bbox_area": 2023.92,
+      "confidence": 0.5756,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:05+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 32.83,
+      "bbox_w": 73.78,
+      "bbox_area": 2543.23,
+      "confidence": 0.7271,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:19:01+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 31.43,
+      "bbox_w": 58.65,
+      "bbox_area": 1842.33,
+      "confidence": 0.7672,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:59+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 31.21,
+      "bbox_w": 63.73,
+      "bbox_area": 2012.86,
+      "confidence": 0.7669,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:19:02+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 31.16,
+      "bbox_w": 60.37,
+      "bbox_area": 1881.19,
+      "confidence": 0.7733,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:19:00+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 29.78,
+      "bbox_w": 56.15,
+      "bbox_area": 1672.27,
+      "confidence": 0.7154,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:58+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 26.73,
+      "bbox_w": 59.69,
+      "bbox_area": 1593.24,
+      "confidence": 0.5122,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:57+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 24.83,
+      "bbox_w": 60.41,
+      "bbox_area": 1499.09,
+      "confidence": 0.522,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:56+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 24.21,
+      "bbox_w": 60.97,
+      "bbox_area": 1476.61,
+      "confidence": 0.6199,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:55+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 23.12,
+      "bbox_w": 61.6,
+      "bbox_area": 1424.78,
+      "confidence": 0.6944,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:54+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 22.04,
+      "bbox_w": 61.03,
+      "bbox_area": 1345.29,
+      "confidence": 0.7321,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:18:53+0900"
+    },
+    {
+      "distance_m": 2.0,
+      "distance_mm": 2000,
+      "bbox_h": 21.57,
+      "bbox_w": 60.22,
+      "bbox_area": 1301.06,
+      "confidence": 0.6434,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:19:05+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 26.41,
+      "bbox_w": 49.23,
+      "bbox_area": 1300.96,
+      "confidence": 0.5229,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:23+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 25.42,
+      "bbox_w": 49.0,
+      "bbox_area": 1245.65,
+      "confidence": 0.4957,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:23+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 21.14,
+      "bbox_w": 45.99,
+      "bbox_area": 972.42,
+      "confidence": 0.5873,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:08+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 21.1,
+      "bbox_w": 46.13,
+      "bbox_area": 973.23,
+      "confidence": 0.5329,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:07+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 20.85,
+      "bbox_w": 46.31,
+      "bbox_area": 965.37,
+      "confidence": 0.588,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:08+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 19.74,
+      "bbox_w": 48.89,
+      "bbox_area": 965.2,
+      "confidence": 0.4952,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:03+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 19.71,
+      "bbox_w": 48.6,
+      "bbox_area": 958.0,
+      "confidence": 0.4467,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:04+0900"
+    },
+    {
+      "distance_m": 2.5,
+      "distance_mm": 2500,
+      "bbox_h": 18.99,
+      "bbox_w": 48.5,
+      "bbox_area": 921.22,
+      "confidence": 0.4913,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:20:03+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 22.11,
+      "bbox_w": 43.55,
+      "bbox_area": 963.05,
+      "confidence": 0.5549,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:19+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 22.11,
+      "bbox_w": 43.55,
+      "bbox_area": 962.9,
+      "confidence": 0.5231,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:20+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 22.04,
+      "bbox_w": 43.4,
+      "bbox_area": 956.76,
+      "confidence": 0.565,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:20+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 15.88,
+      "bbox_w": 40.41,
+      "bbox_area": 642.01,
+      "confidence": 0.6144,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:04+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 15.66,
+      "bbox_w": 38.01,
+      "bbox_area": 595.19,
+      "confidence": 0.651,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:27+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 15.56,
+      "bbox_w": 39.79,
+      "bbox_area": 619.21,
+      "confidence": 0.5984,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:05+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 15.47,
+      "bbox_w": 40.02,
+      "bbox_area": 619.04,
+      "confidence": 0.5816,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:05+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 15.22,
+      "bbox_w": 38.14,
+      "bbox_area": 580.46,
+      "confidence": 0.6348,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:28+0900"
+    },
+    {
+      "distance_m": 3.0,
+      "distance_mm": 3000,
+      "bbox_h": 15.07,
+      "bbox_w": 36.46,
+      "bbox_area": 549.49,
+      "confidence": 0.5592,
+      "sample_count": 30,
+      "timestamp": "2026-05-18T17:21:28+0900"
+    }
+  ]
+}

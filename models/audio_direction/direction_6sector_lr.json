@@ -1,0 +1,18 @@
+{
+  "dataset": "/home/jetson/jy2/dataset_audio_angle",
+  "rows": 18,
+  "windows": 2119,
+  "angles": [
+    0,
+    60,
+    120,
+    180,
+    240,
+    300
+  ],
+  "holdout_distance_m": 3.0,
+  "train_accuracy": 0.9454287739192062,
+  "holdout_accuracy": 0.8940677966101694,
+  "all_fit_accuracy": 0.9476168003775366,
+  "model": "/home/jetson/ultra_yubin_v1/models/audio_direction/direction_6sector_lr.npz"
+}

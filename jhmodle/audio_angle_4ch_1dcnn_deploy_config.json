@@ -1,0 +1,38 @@
+{
+  "model_name": "audio_angle_4ch_1dcnn_float32",
+  "task": "6-class coarse angle classification",
+  "input_shape": [
+    1,
+    16000,
+    4
+  ],
+  "input_layout": "NHWC-like for 1D: [batch, time, channels]",
+  "original_pytorch_input_shape": [
+    1,
+    4,
+    16000
+  ],
+  "sample_rate": 16000,
+  "segment_sec": 1.0,
+  "segment_samples": 16000,
+  "channels": 4,
+  "num_classes": 6,
+  "class_to_angle_deg": {
+    "0": 0,
+    "1": 60,
+    "2": 120,
+    "3": 180,
+    "4": 240,
+    "5": 300
+  },
+  "preprocess": {
+    "description": "Per-channel normalization for each 1-sec segment",
+    "input_before_normalization": "[4, 16000]",
+    "mean_axis": "time axis per channel",
+    "std_axis": "time axis per channel",
+    "formula": "x_norm[ch, :] = (x[ch, :] - mean(x[ch, :])) / max(std(x[ch, :]), 1e-6)",
+    "tflite_input_after_transpose": "[1, 16000, 4]"
+  },
+  "best_epoch": 10,
+  "best_val_acc": 0.985897435897436
+}

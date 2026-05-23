@@ -5,7 +5,8 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "${ROOT}"
 
 PY="${PYTHON:-/home/jetson/yubin/.venv/bin/python3}"
-MODEL="${TELLO_AUDIO_JUNMO_MODEL:-/home/jetson/junmoyolo26/tello_detector.tflite}"
+MODEL="${TELLO_AUDIO_JUNMO_MODEL:-${ROOT}/model/tello_detector_cnn_retrained_jetson.tflite}"
+CONFIG="${TELLO_AUDIO_JUNMO_CONFIG:-${ROOT}/model/config.json}"
 PIPELINE="${TELLO_AUDIO_JUNMO_PIPELINE:-${ROOT}/jetson/src/audio/junmo_pipeline_drone.py}"
 pkill -9 arecord >/dev/null 2>&1 || true
 export TELLO_AUDIO_USB_RESET_ON_ERROR="${TELLO_AUDIO_USB_RESET_ON_ERROR:-0}"
@@ -31,12 +32,14 @@ else
 fi
 
 exec "${PY}" "${PIPELINE}" \
-  --channels "${TELLO_AUDIO_CHANNELS:-4}" \
+  --channels "${TELLO_AUDIO_CHANNELS:-6}" \
   --model "${MODEL}" \
-  --threshold "${TELLO_AUDIO_THRESHOLD:-0.70}" \
+  --config "${CONFIG}" \
+  --threshold "${TELLO_AUDIO_THRESHOLD:-0.50}" \
   --consecutive "${TELLO_AUDIO_CONSECUTIVE:-2}" \
-  --cooldown "${TELLO_AUDIO_COOLDOWN_SEC:-0.60}" \
-  --min-rms "${TELLO_AUDIO_MIN_RMS:-0.008}" \
-  --doa-method "${TELLO_AUDIO_DOA_METHOD:-gcc}" \
+  --cooldown "${TELLO_AUDIO_COOLDOWN_SEC:-0.10}" \
+  --min-rms "${TELLO_AUDIO_MIN_RMS:-0.003}" \
+  --doa-method "${TELLO_AUDIO_DOA_METHOD:-auto}" \
   --audio-backend "${TELLO_AUDIO_BACKEND:-arecord}" \
-  --alsa-device "${ALSA_DEVICE}"
+  --alsa-device "${ALSA_DEVICE}" \
+  --stride-sec "${TELLO_AUDIO_STRIDE_SEC:-0.25}"

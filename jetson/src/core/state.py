@@ -53,6 +53,8 @@ class SharedState:
         self.audio_section = None
         self.audio_detected = False
         self.audio_updated_at = 0.0
+        self.audio_last_detected_at = 0.0
+        self.audio_last_detection_doa = None
 
     def transition(self, new_state: SystemState):
         if self.system_state == new_state:
@@ -81,6 +83,9 @@ class SharedState:
             self.audio_section = section
             self.audio_detected = bool(detected)
             self.audio_updated_at = time.time()
+            if detected:
+                self.audio_last_detected_at = self.audio_updated_at
+                self.audio_last_detection_doa = self.audio_doa
             if add_log:
                 self.event_log.append((time.time(), text))
                 if len(self.event_log) > 50:

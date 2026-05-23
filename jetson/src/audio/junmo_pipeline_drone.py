@@ -9,17 +9,29 @@ pipelines.
 """
 
 import argparse
+import json
 import math
 import os
 import queue
 import struct
 import subprocess
+import sys
 import threading
 import time
 from collections import deque
 
 import numpy as np
 
+
+os.environ.setdefault("NUMBA_CACHE_DIR", "/tmp/numba_cache")
+os.environ.setdefault("LIBROSA_CACHE_DIR", "/tmp/librosa_cache")
+for _path in (
+    "/home/jetson/.local/lib/python3.10/site-packages",
+    "/usr/local/lib/python3.10/dist-packages",
+    "/usr/lib/python3/dist-packages",
+):
+    if os.path.isdir(_path) and _path not in sys.path:
+        sys.path.append(_path)
 
 TARGET_SR = 16000
 CHUNK_SAMPLES = 8000
@@ -30,6 +42,12 @@ N_MELS = 64
 FMIN = 50.0
 FMAX = 8000.0
 DOA_POLL_INTERVAL = 0.1
+DEFAULT_CLASSES = ["noise", "tello"]
+
+
+def handle_drone_detected(doa_angle, tello_prob):
+    # TODO: Dynamixel pan/tilt motor control 연결
+    print(f"[DRONE DETECTED] doa={doa_angle}, prob={tello_prob}", flush=True)
 
 
 def doa_to_section(angle: float) -> int:
@@ -169,33 +187,60 @@ _MEL_BASIS = _mel_filterbank()
 _HANN = np.hanning(N_FFT + 1)[:-1].astype(np.float32)
 
 
-def audio_to_logmel(audio):
+def load_audio_config(config_path=None):
+    data = {}
+    if config_path:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    return {
+        "sr": int(data.get("sr", data.get("sample_rate", TARGET_SR))),
+        "clip_len": int(data.get("clip_len", data.get("clip_samples", CLIP_SAMPLES))),
+        "n_mels": int(data.get("n_mels", N_MELS)),
+        "n_fft": int(data.get("n_fft", N_FFT)),
+        "hop_length": int(data.get("hop_length", HOP_LENGTH)),
+        "fmin": float(data.get("fmin", FMIN)),
+        "fmax": float(data.get("fmax", FMAX)),
+        "classes": list(data.get("classes", DEFAULT_CLASSES)),
+    }
+
+
+def audio_to_logmel(audio, cfg=None):
+    cfg = cfg or load_audio_config(None)
     y = np.asarray(audio, dtype=np.float32)
-    if y.size != CLIP_SAMPLES:
-        if y.size < CLIP_SAMPLES:
-            y = np.pad(y, (0, CLIP_SAMPLES - y.size))
+    clip_len = int(cfg["clip_len"])
+    if y.size != clip_len:
+        if y.size < clip_len:
+            y = np.pad(y, (0, clip_len - y.size))
         else:
-            y = y[-CLIP_SAMPLES:]
+            y = y[-clip_len:]
 
-    peak = float(np.max(np.abs(y)) + 1e-9)
-    y = y / peak
-
-    y = np.pad(y, (N_FFT // 2, N_FFT // 2), mode="constant")
+    n_fft = int(cfg["n_fft"])
+    hop_length = int(cfg["hop_length"])
+    n_mels = int(cfg["n_mels"])
+    mel_basis = _mel_filterbank(
+        int(cfg["sr"]),
+        n_fft,
+        n_mels,
+        float(cfg["fmin"]),
+        float(cfg["fmax"]),
+    )
+    hann = np.hanning(n_fft + 1)[:-1].astype(np.float32)
+    y = np.pad(y, (n_fft // 2, n_fft // 2), mode="constant")
     frames = []
-    for start in range(0, len(y) - N_FFT + 1, HOP_LENGTH):
-        frame = y[start : start + N_FFT] * _HANN
-        spectrum = np.fft.rfft(frame, n=N_FFT)
-        frames.append(np.abs(spectrum) ** 2)
-
+    for start in range(0, len(y) - n_fft + 1, hop_length):
+        frame = y[start : start + n_fft] * hann
+        frames.append(np.abs(np.fft.rfft(frame, n=n_fft)) ** 2)
     power = np.asarray(frames, dtype=np.float32).T
-    mel = np.maximum(np.dot(_MEL_BASIS, power), 1e-10)
-
+    mel = np.maximum(np.dot(mel_basis, power), 1e-10)
     ref = float(np.max(mel))
-    logmel = 10.0 * np.log10(np.maximum(mel, 1e-10)) - 10.0 * np.log10(max(ref, 1e-10))
-    logmel = np.maximum(logmel, -80.0)
-    logmel = (logmel + 80.0) / 80.0
-    logmel = np.clip(logmel, 0.0, 1.0).astype(np.float32)
-    return logmel[..., np.newaxis]
+    mel_db = 10.0 * np.log10(mel) - 10.0 * np.log10(max(ref, 1e-10))
+    target_frames = int(cfg.get("target_frames", cfg.get("input_shape", [1, n_mels, 63, 1])[2]))
+    if mel_db.shape[1] < target_frames:
+        mel_db = np.pad(mel_db, ((0, 0), (0, target_frames - mel_db.shape[1])), mode="edge")
+    elif mel_db.shape[1] > target_frames:
+        mel_db = mel_db[:, :target_frames]
+    mel_db = (mel_db - np.mean(mel_db)) / (np.std(mel_db) + 1e-6)
+    return mel_db.astype(np.float32)[..., np.newaxis]
 
 
 def gcc_phat(sig, refsig, fs=TARGET_SR, max_tau=None, interp=16):
@@ -230,7 +275,7 @@ def estimate_direction_4ch(audio_4ch, fs=TARGET_SR, mic_distance=0.065):
 
 
 class DroneAudioDetector:
-    def __init__(self, model_path):
+    def __init__(self, model_path, config_path=None):
         try:
             import tflite_runtime.interpreter as tflite
         except ImportError as exc:
@@ -241,6 +286,10 @@ class DroneAudioDetector:
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(model_path)
+        self.config = load_audio_config(config_path)
+        self.sample_rate = int(self.config["sr"])
+        self.clip_len = int(self.config["clip_len"])
+        self.clip_sec = float(self.clip_len) / float(max(1, self.sample_rate))
 
         try:
             self._interpreter = tflite.Interpreter(model_path=model_path)
@@ -258,25 +307,34 @@ class DroneAudioDetector:
         self._output = self._interpreter.get_output_details()[0]
 
         expected = tuple(self._input["shape"])
-        if expected != (1, 64, 63, 1):
-            print(f"[AUDIO] warning: unexpected model input shape {expected}")
+        expected_frames = 1 + self.clip_len // int(self.config["hop_length"])
+        expected_from_config = (1, int(self.config["n_mels"]), expected_frames, 1)
+        if expected != expected_from_config:
+            print(f"[AUDIO] warning: model input shape={expected} config shape={expected_from_config}")
         print(f"[AUDIO] drone model loaded: {model_path}")
+        if config_path:
+            print(f"[AUDIO] config loaded: {config_path}")
 
     def predict(self, audio):
-        x = audio_to_logmel(audio)[np.newaxis, ...].astype(np.float32)
+        x = audio_to_logmel(audio, self.config)[np.newaxis, ...].astype(np.float32)
         self._interpreter.set_tensor(self._input["index"], x)
         self._interpreter.invoke()
         y = self._interpreter.get_tensor(self._output["index"])
-        return float(np.ravel(y)[0])
+        classes = self.config.get("classes", DEFAULT_CLASSES)
+        noise_idx = classes.index("noise") if "noise" in classes else 0
+        tello_idx = classes.index("tello") if "tello" in classes else 1
+        return float(y[0][noise_idx]), float(y[0][tello_idx])
 
 
 def _find_respeaker_device(sd):
     for i, dev in enumerate(sd.query_devices()):
-        if "ReSpeaker" in dev["name"] and dev["max_input_channels"] > 0:
+        name = str(dev["name"])
+        if "FHD60F" in name:
+            continue
+        if any(key in name for key in ("ReSpeaker", "ArrayUAC10", "Seeed")) and dev["max_input_channels"] > 0:
             print(f"[AUDIO] ReSpeaker auto device={i} ({dev['name']})")
             return i
-    print("[WARN] ReSpeaker not found by name; using default input device")
-    return None
+    raise RuntimeError("ReSpeaker input device not found; refusing default/camera audio input")
 
 
 def _usb_reset_respeaker():
@@ -296,8 +354,8 @@ def _usb_reset_respeaker():
         print(f"[AUDIO] USB reset failed (ignored): {exc}")
 
 
-def _read_arecord_chunk(proc, n_channels):
-    bytes_needed = CHUNK_SAMPLES * n_channels * 2
+def _read_arecord_chunk(proc, n_channels, chunk_samples):
+    bytes_needed = chunk_samples * n_channels * 2
     chunks = []
     total = 0
     while total < bytes_needed:
@@ -321,22 +379,31 @@ def run(
     n_channels: int,
     on_detect,
     model_path,
-    threshold=0.70,
+    config_path=None,
+    threshold=0.50,
     min_avg_score=None,
-    consecutive=2,
+    consecutive=3,
     cooldown=2.0,
     min_rms=0.008,
     doa_offset=0,
     doa_method="auto",
     mic_distance=0.065,
-    audio_backend="arecord",
+    audio_backend="sounddevice",
     alsa_device="plughw:CARD=ArrayUAC10,DEV=0",
+    stride_sec=None,
     verbose=None,
 ):
     if verbose is None:
         verbose = os.getenv("TELLO_AUDIO_VERBOSE", "0") == "1"
-    detector = DroneAudioDetector(model_path)
-    min_avg_score = float(threshold if min_avg_score is None else min_avg_score)
+    detector = DroneAudioDetector(model_path, config_path=config_path)
+    min_avg_score = float(0.55 if min_avg_score is None else min_avg_score)
+    window_size = int(os.getenv("TELLO_AUDIO_WINDOW_SIZE", "5"))
+    window_size = max(1, window_size)
+    consecutive = max(1, min(int(consecutive), window_size))
+    if stride_sec is None:
+        stride_sec = float(os.getenv("TELLO_AUDIO_STRIDE_SEC", "0.25"))
+    stride_sec = max(0.05, min(float(stride_sec), float(detector.clip_sec)))
+    chunk_samples = max(1, int(round(detector.sample_rate * stride_sec)))
 
     doa_reader = None
     doa_history = None
@@ -358,8 +425,8 @@ def run(
 
     audio_q = queue.Queue()
     audio_buf = np.zeros((0, max(1, int(n_channels))), dtype=np.float32)
-    hit_count = 0
-    hit_scores = deque(maxlen=max(1, int(consecutive)))
+    hit_window = deque(maxlen=window_size)
+    hit_scores = deque(maxlen=window_size)
     last_detect = 0.0
 
     if audio_backend not in ("arecord", "sounddevice"):
@@ -371,7 +438,7 @@ def run(
         def callback(indata, frames, time_info, status):
             if status:
                 print(f"[AUDIO] input status: {status}")
-            audio_q.put(indata.astype(np.float32) / 32768.0)
+            audio_q.put((indata.astype(np.float32).copy(), time.perf_counter()))
 
         if device is None:
             device = _find_respeaker_device(sd)
@@ -381,11 +448,16 @@ def run(
     if verbose:
         print("\n[Drone Audio Pipeline] Ctrl+C to stop")
         print(f"  model={model_path}")
+        if config_path:
+            print(f"  config={config_path}")
         print(
-            f"  threshold={threshold:.2f} min_avg={min_avg_score:.2f} "
-            f"consecutive={consecutive} cooldown={cooldown:.1f}s"
+            f"  threshold={threshold:.2f} smoothing={consecutive}/{window_size} "
+            f"cooldown={cooldown:.1f}s"
         )
-        print(f"  rms gate={min_rms:.4f} channels={n_channels} backend={audio_backend}")
+        print(
+            f"  rms gate={min_rms:.4f} channels={n_channels} backend={audio_backend} "
+            f"clip={detector.clip_sec:.2f}s stride={stride_sec:.2f}s"
+        )
         print(f"  device={device if audio_backend == 'sounddevice' else alsa_device}")
         print(f"  doa={active_doa_method} mic_distance={mic_distance:.3f}m\n")
 
@@ -395,11 +467,11 @@ def run(
         try:
             if audio_backend == "sounddevice":
                 stream = sd.InputStream(
-                    samplerate=TARGET_SR,
+                    samplerate=detector.sample_rate,
                     channels=n_channels,
                     device=device,
-                    blocksize=CHUNK_SAMPLES,
-                    dtype="int16",
+                    blocksize=chunk_samples,
+                    dtype="float32",
                     callback=callback,
                 )
                 stream.start()
@@ -412,7 +484,7 @@ def run(
                         "-f",
                         "S16_LE",
                         "-r",
-                        str(TARGET_SR),
+                        str(detector.sample_rate),
                         "-c",
                         str(n_channels),
                         "-t",
@@ -426,67 +498,80 @@ def run(
 
             while True:
                 if audio_backend == "sounddevice":
-                    chunk = audio_q.get(timeout=1.0)
+                    chunk, captured_at = audio_q.get(timeout=1.0)
                 else:
-                    chunk = _read_arecord_chunk(proc, n_channels)
+                    chunk = _read_arecord_chunk(proc, n_channels, chunk_samples)
+                    captured_at = time.perf_counter()
                 if chunk.ndim == 1:
                     chunk = chunk[:, np.newaxis]
                 audio_buf = np.concatenate((audio_buf, chunk))
-                if audio_buf.shape[0] > CLIP_SAMPLES:
-                    audio_buf = audio_buf[-CLIP_SAMPLES:]
-                if audio_buf.shape[0] < CLIP_SAMPLES:
+                if audio_buf.shape[0] > detector.clip_len:
+                    audio_buf = audio_buf[-detector.clip_len:]
+                if audio_buf.shape[0] < detector.clip_len:
                     continue
 
-                mono = audio_buf[:, 0]
+                if audio_buf.shape[1] < 4:
+                    print("\n[AUDIO-WARNING] ReSpeaker stream needs at least 4 channels")
+                    time.sleep(1.0)
+                    continue
+
+                raw_audio = audio_buf
+                mic_4ch = raw_audio[:, 0:4]
+                mono = mic_4ch.mean(axis=1).astype(np.float32)
+                mono = np.clip(mono, -1.0, 1.0)
                 rms = float(np.sqrt(np.mean(mono * mono)))
                 if doa_history is not None:
                     doa = doa_history.mean_angle()
-                elif audio_buf.shape[1] >= 4:
-                    doa = estimate_direction_4ch(audio_buf[:, :4], mic_distance=mic_distance)
                 else:
-                    print("\n[AUDIO-WARNING] GCC-PHAT DOA needs at least 4 channels")
-                    time.sleep(1.0)
-                    continue
+                    doa = estimate_direction_4ch(mic_4ch, mic_distance=mic_distance)
+                    doa = (doa + doa_offset) % 360.0
                 section = doa_to_section(doa)
 
+                noise_prob, tello_prob = detector.predict(mono)
+                candidate = bool(tello_prob >= threshold and rms >= min_rms)
+                hit_window.append(candidate)
+                hit_scores.append(tello_prob)
+                avg_score = float(np.mean(hit_scores)) if hit_scores else 0.0
+                hit_count = int(sum(hit_window))
+                detected = (
+                    len(hit_window) >= window_size
+                    and hit_count >= consecutive
+                    and avg_score >= min_avg_score
+                )
+                latency_ms = int(round((time.perf_counter() - captured_at) * 1000.0))
+                print(
+                    f"tello_prob={tello_prob:.3f}, noise_prob={noise_prob:.3f}, "
+                    f"candidate={candidate}, detected={detected}, count={hit_count}/{window_size}, "
+                    f"avg={avg_score:.3f}, latency={latency_ms}ms, doa={int(round(doa)) % 360}",
+                    flush=True,
+                )
+
                 if rms < min_rms:
-                    hit_count = 0
-                    hit_scores.clear()
-                    if verbose:
-                        print(
-                            f"\r  drone=quiet rms={rms:.4f} doa={doa:6.1f}° "
-                            f"section={section}({SECTION_LABEL[section]})      ",
-                            end="",
-                            flush=True,
-                        )
                     continue
 
-                score = detector.predict(mono)
-                if score >= threshold:
-                    hit_count += 1
-                    hit_scores.append(score)
-                else:
-                    hit_count = 0
-                    hit_scores.clear()
-                avg_score = float(np.mean(hit_scores)) if hit_scores else 0.0
+                now = time.time()
+                if detected and now - last_detect >= cooldown:
+                    last_detect = now
+                    handle_drone_detected(doa, tello_prob)
+                    action = {
+                        "action": "move",
+                        "section": section,
+                        "confidence": tello_prob,
+                        "avg_score": avg_score,
+                        "hit_count": hit_count,
+                        "raw_doa_deg": doa,
+                        "rms": rms,
+                        "latency_ms": latency_ms,
+                    }
+                    on_detect("DRONE_AUDIO", doa, section, False, 1, action)
 
                 if verbose:
                     print(
-                        f"\r  drone={score:.3f} avg={avg_score:.3f} hit={hit_count}/{consecutive} rms={rms:.4f} "
-                        f"doa={doa:6.1f}° section={section}({SECTION_LABEL[section]})      ",
+                        f"\r  drone={tello_prob:.3f} avg={avg_score:.3f} hit={hit_count}/{window_size} "
+                        f"rms={rms:.4f} doa={doa:6.1f}° section={section}({SECTION_LABEL[section]})      ",
                         end="",
                         flush=True,
                     )
-
-                now = time.time()
-                if hit_count >= consecutive and avg_score >= min_avg_score and now - last_detect >= cooldown:
-                    last_detect = now
-                    action = {"action": "move", "section": section, "confidence": score}
-                    print(
-                        f"[DRONE-AUDIO] DETECTED score={score:.3f} avg={avg_score:.3f} "
-                        f"doa={doa:.1f}° section={section}"
-                    )
-                    on_detect("DRONE_AUDIO", doa, section, False, 1, action)
 
         except KeyboardInterrupt:
             if stream is not None:
@@ -518,21 +603,24 @@ def run(
 
 
 def main():
+    root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
     parser = argparse.ArgumentParser(description="Drone audio detector pipeline")
     parser.add_argument("--device", default=None, help="audio device number or 'list'")
     parser.add_argument("--channels", type=int, default=6)
     parser.add_argument(
         "--model",
-        default=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "tello_detector.tflite"),
+        default=os.path.join(root, "model", "tello_detector_cnn_retrained_jetson.tflite"),
     )
-    parser.add_argument("--threshold", type=float, default=0.70)
-    parser.add_argument("--consecutive", type=int, default=2)
+    parser.add_argument("--config", default=os.path.join(root, "model", "config.json"))
+    parser.add_argument("--threshold", type=float, default=0.50)
+    parser.add_argument("--consecutive", type=int, default=3)
     parser.add_argument("--cooldown", type=float, default=2.0)
     parser.add_argument("--min-rms", type=float, default=0.008)
     parser.add_argument("--doa-method", choices=["auto", "usb", "gcc"], default="auto")
     parser.add_argument("--mic-distance", type=float, default=0.065)
-    parser.add_argument("--audio-backend", choices=["arecord", "sounddevice"], default="arecord")
-    parser.add_argument("--alsa-device", default="plughw:CARD=ArrayUAC10,DEV=0")
+    parser.add_argument("--audio-backend", choices=["arecord", "sounddevice"], default="sounddevice")
+    parser.add_argument("--alsa-device", default="auto")
+    parser.add_argument("--stride-sec", type=float, default=None)
     args = parser.parse_args()
 
     if args.device == "list":
@@ -551,6 +639,7 @@ def main():
         args.channels,
         on_detect,
         args.model,
+        config_path=args.config,
         threshold=args.threshold,
         consecutive=args.consecutive,
         cooldown=args.cooldown,
@@ -559,6 +648,7 @@ def main():
         mic_distance=args.mic_distance,
         audio_backend=args.audio_backend,
         alsa_device=args.alsa_device,
+        stride_sec=args.stride_sec,
     )
 
 

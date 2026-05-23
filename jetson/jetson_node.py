@@ -395,6 +395,46 @@ def audio_doa_to_motor_angle(doa_angle):
     return normalize_audio_angle((float(doa_angle) - zero_doa) * sign)
 
 
+def quantize_absolute_audio_angle(angle, sector_deg=None):
+    sector = float(sector_deg if sector_deg is not None else getattr(config, "TELLO_AUDIO_DIRECTION_SECTOR_DEG", 60.0))
+    if sector <= 0.0:
+        return float(angle) % 360.0
+    return (round((float(angle) % 360.0) / sector) * sector) % 360.0
+
+
+def audio_detection_to_motor_angle(audio_detection):
+    mode = str(getattr(config, "TELLO_AUDIO_DIRECTION_MODE", "legacy")).lower()
+    raw_abs = float(
+        audio_detection.get(
+            "raw_doa_deg",
+            audio_detection.get("raw_angle", audio_detection.get("angle", 0.0)),
+        )
+    )
+    if mode in ("sector6_calibrated", "gcc_sector6", "sector_calibrated"):
+        corrected_abs = (raw_abs + float(getattr(config, "TELLO_AUDIO_GCC_CAL_OFFSET_DEG", 120.0))) % 360.0
+        sector_abs = quantize_absolute_audio_angle(corrected_abs)
+        motor_angle = normalize_audio_angle(sector_abs)
+        audio_detection["raw_doa_deg"] = raw_abs
+        audio_detection["corrected_doa_deg"] = corrected_abs
+        audio_detection["sector_doa_deg"] = sector_abs
+        audio_detection["direction_mode"] = mode
+        return motor_angle
+    if mode in ("learned6", "learned_6sector", "direction_model", "cnn6", "cnn_6sector", "cnn_direction", "tflite6"):
+        learned_abs = audio_detection.get("learned_direction_deg")
+        if learned_abs is not None:
+            learned_abs = float(learned_abs) % 360.0
+            audio_detection["raw_doa_deg"] = raw_abs
+            audio_detection["corrected_doa_deg"] = learned_abs
+            audio_detection["sector_doa_deg"] = learned_abs
+            audio_detection["direction_mode"] = mode
+            return normalize_audio_angle(learned_abs)
+    audio_detection["raw_doa_deg"] = raw_abs
+    audio_detection["corrected_doa_deg"] = raw_abs
+    audio_detection["sector_doa_deg"] = None
+    audio_detection["direction_mode"] = "legacy"
+    return audio_doa_to_motor_angle(raw_abs)
+
+
 class AudioDirectionStabilizer:
     def __init__(self, window=7, min_votes=3, max_spread_deg=35.0, reject_rear=True):
         self.window = max(1, int(window))
@@ -406,6 +446,18 @@ class AudioDirectionStabilizer:
 
     def _bin(self, angle):
         angle = normalize_audio_angle(angle)
+        mode = str(getattr(config, "TELLO_AUDIO_DIRECTION_MODE", "legacy")).lower()
+        if mode in (
+            "sector6_calibrated",
+            "gcc_sector6",
+            "sector_calibrated",
+            "cnn6",
+            "cnn_6sector",
+            "cnn_direction",
+            "tflite6",
+        ):
+            sector_abs = quantize_absolute_audio_angle(angle % 360.0)
+            return f"sector:{int(round(sector_abs)) % 360}"
         if -45.0 <= angle <= 45.0:
             return "front"
         if 45.0 < angle <= 135.0:
@@ -575,7 +627,15 @@ def main():
     audio = None
     audio_started = False
     audio_lazy_start = bool(getattr(config, "TELLO_AUDIO_LAZY_START", False))
+    audio_pause_while_vision = bool(getattr(config, "TELLO_AUDIO_PAUSE_WHILE_VISION", True))
     audio_mode = str(config.TELLO_AUDIO_MODE).lower()
+    if args.audio_fallback and audio_mode in ("model", "junmo"):
+        try:
+            warmup_frame = cam.read()
+            detector.track(warmup_frame)
+            print("[vision] TensorRT warmup complete before audio init")
+        except Exception as exc:
+            print(f"[vision] TensorRT warmup before audio failed: {exc}")
     if args.audio_fallback:
         try:
             if audio_mode == "model":
@@ -589,6 +649,8 @@ def main():
                     consecutive=config.TELLO_AUDIO_CONSECUTIVE,
                     min_rms=config.TELLO_AUDIO_MIN_RMS,
                     doa_offset=config.TELLO_AUDIO_DOA_OFFSET,
+                    doa_method=config.TELLO_AUDIO_DOA_METHOD,
+                    verbose=config.TELLO_AUDIO_VERBOSE,
                 )
                 if not audio_lazy_start:
                     audio.start()
@@ -598,6 +660,7 @@ def main():
                 audio = JunmoDroneAudioFallback(
                     config.TELLO_AUDIO_JUNMO_MODEL,
                     project_root=config.TELLO_AUDIO_JUNMO_ROOT,
+                    config_path=config.TELLO_AUDIO_JUNMO_CONFIG,
                     alsa_device=config.TELLO_AUDIO_ALSA_DEVICE,
                     channels=config.TELLO_AUDIO_CHANNELS,
                     threshold=config.TELLO_AUDIO_THRESHOLD,
@@ -609,12 +672,13 @@ def main():
                     doa_method=config.TELLO_AUDIO_DOA_METHOD,
                     mic_distance=config.TELLO_AUDIO_MIC_DISTANCE,
                     audio_backend=config.TELLO_AUDIO_BACKEND,
+                    stride_sec=config.TELLO_AUDIO_STRIDE_SEC,
                     verbose=config.TELLO_AUDIO_VERBOSE,
                 )
                 if not audio_lazy_start:
                     audio.start()
                     audio_started = True
-                audio_device = f"junmoyolo26:{config.TELLO_AUDIO_ALSA_DEVICE}"
+                audio_device = f"local-jy2:{audio.alsa_device}"
             else:
                 audio_mode = "doa"
                 audio = ReSpeakerDOA(offset=config.TELLO_AUDIO_DOA_OFFSET)
@@ -658,6 +722,7 @@ def main():
     last_audio_sent = 0.0
     last_audio_angle = None
     last_audio_detection_time = 0.0
+    audio_blind_until = 0.0
     smooth_target_center = None
     last_raw_target_center = None
     last_raw_target_frame_idx = None
@@ -792,6 +857,23 @@ def main():
             })
 
             if target and config.TRACK_VISION_MOTOR_ENABLE:
+                if (
+                    audio_pause_while_vision
+                    and audio
+                    and audio_started
+                    and hasattr(audio, "pause")
+                    and not (hasattr(audio, "is_paused") and audio.is_paused())
+                ):
+                    audio.pause()
+                    state.update_audio_status(
+                        "AUDIO PAUSED VISION",
+                        state.audio_score,
+                        state.audio_rms,
+                        state.audio_doa,
+                        state.audio_section,
+                        False,
+                    )
+                    print("[audio] paused while vision tracking")
                 lost_since = None
                 audio_search_limiter.reset()
                 detect_count += 1
@@ -1166,10 +1248,38 @@ def main():
                             add_log=True,
                         )
                         print(f"[audio] lazy fallback disabled: {exc}")
+                elif (
+                    audio_pause_while_vision
+                    and audio
+                    and audio_started
+                    and hasattr(audio, "resume")
+                    and hasattr(audio, "is_paused")
+                    and audio.is_paused()
+                    and now_lost - lost_since >= float(getattr(config, "TELLO_AUDIO_LAZY_START_AFTER_SEC", 0.8))
+                ):
+                    audio.resume()
+                    state.update_audio_status("AUDIO READY", 0.0, 0.0, None, None, False)
+                    print("[audio] resumed after vision loss")
                 audio_allowed = bool(audio) and audio_started and not state.is_vision_active(
                     hold_sec=float(getattr(config, "TELLO_AUDIO_VISION_HOLD_SEC", 0.15))
                 )
-                if audio and not audio_allowed:
+                audio_live_status = None
+                audio_error = audio.get_error() if audio and hasattr(audio, "get_error") else ""
+                if audio_error:
+                    state.update_audio_status(
+                        f"AUDIO ERROR: {audio_error}",
+                        0.0,
+                        0.0,
+                        None,
+                        None,
+                        False,
+                        add_log=True,
+                    )
+                    audio_detection = None
+                    audio_live_status = None
+                    audio = None
+                    audio_started = False
+                elif audio and not audio_allowed:
                     state.update_audio_status(
                         "AUDIO STANDBY" if not audio_started else "AUDIO HOLD VISION",
                         state.audio_score,
@@ -1181,6 +1291,8 @@ def main():
                     audio_detection = None
                 elif audio and audio_mode in ("model", "junmo"):
                     audio_detection = audio.get_detection(config.TELLO_AUDIO_MAX_AGE_SEC)
+                    if hasattr(audio, "get_status"):
+                        audio_live_status = audio.get_status(config.TELLO_AUDIO_MAX_AGE_SEC)
                 elif audio and audio_mode == "doa":
                     raw_angle = audio.read()
                     if bool(getattr(config, "TELLO_AUDIO_DOA_ONLY_SEARCH", False)):
@@ -1208,19 +1320,32 @@ def main():
                     if detection_time and detection_time <= last_audio_detection_time:
                         audio_detection = None
                 if audio_detection:
+                    blind_remaining = audio_blind_until - time.perf_counter()
+                    if blind_remaining > 0.0:
+                        detection_time = float(audio_detection.get("time", 0.0) or 0.0)
+                        if detection_time:
+                            last_audio_detection_time = max(last_audio_detection_time, detection_time)
+                        state.update_audio_status(
+                            "AUDIO MOTOR BLIND",
+                            audio_detection.get("score", 0.0),
+                            audio_detection.get("rms", 0.0),
+                            state.audio_doa,
+                            state.audio_section,
+                            False,
+                        )
+                        audio_detection = None
+                if audio_detection:
                     detection_time = float(audio_detection.get("time", 0.0) or 0.0)
                     if detection_time:
                         last_audio_detection_time = detection_time
-                    if audio_mode in ("junmo", "doa"):
-                        signed_angle = audio_doa_to_motor_angle(audio_detection["angle"])
-                    else:
-                        signed_angle = normalize_audio_angle(audio_detection["angle"])
-                        signed_angle *= float(getattr(config, "TELLO_AUDIO_DOA_SIGN", 1))
+                    signed_angle = audio_detection_to_motor_angle(audio_detection)
+                    raw_doa_deg = float(audio_detection.get("raw_doa_deg", audio_detection.get("angle", 0.0)))
                     stable_angle = audio_stabilizer.update(
                         signed_angle,
                         audio_detection.get("score", 1.0),
                     )
                     audio_detection["stable_reason"] = audio_stabilizer.last_reason
+                    audio_detection["motor_angle_deg"] = signed_angle
                     audio_detection["signed_angle"] = signed_angle
                     if stable_angle is None:
                         audio_angle = max(
@@ -1278,8 +1403,23 @@ def main():
                             event = "audio_hold"
                         else:
                             last_telemetry = motor.turn_to_doa(audio_angle)
-                            last_audio_sent = time.perf_counter()
+                            sent_now = time.perf_counter()
+                            last_audio_sent = sent_now
                             last_audio_angle = audio_angle
+                            audio_blind_until = sent_now + max(
+                                0.0,
+                                float(getattr(config, "TELLO_AUDIO_MOTOR_NOISE_BLIND_SEC", 0.8)),
+                            )
+                            print(
+                                f"[AUDIO->MOTOR] angle={audio_angle:.1f} "
+                                f"raw_doa={raw_doa_deg:.1f} "
+                                f"corrected={audio_detection.get('corrected_doa_deg', raw_doa_deg):.1f} "
+                                f"sector={audio_detection.get('sector_doa_deg', '-') } "
+                                f"score={audio_detection.get('score', 0.0):.3f} "
+                                f"reason={audio_detection.get('stable_reason', '-')} "
+                                f"blind={max(0.0, audio_blind_until - sent_now):.2f}s",
+                                flush=True,
+                            )
                             event = "audio_fallback"
                     else:
                         last_telemetry = motor_skip_telemetry(
@@ -1295,6 +1435,17 @@ def main():
                             active=0,
                         )
                         event = "audio_hold"
+                elif audio_live_status:
+                    live_angle = audio_doa_to_motor_angle(audio_live_status["angle"])
+                    live_section = audio_section(live_angle)
+                    state.update_audio_status(
+                        "AUDIO QUIET" if audio_live_status.get("quiet") else "AUDIO LISTEN",
+                        audio_live_status.get("score", 0.0),
+                        audio_live_status.get("rms", 0.0),
+                        live_angle,
+                        live_section,
+                        False,
+                    )
                 elif hold_motor_on_lost:
                     last_cx, last_cy = last_motor_target_center or (
                         int(last_telemetry.get("send_cx", camera_center_x)),
@@ -1312,7 +1463,14 @@ def main():
                     event = "no_target_hold"
                 elif audio:
                     if frame_idx % 30 == 0:
-                        state.update_audio_status("AUDIO LISTEN", 0.0, 0.0, None, None, False)
+                        state.update_audio_status(
+                            "AUDIO LISTEN",
+                            state.audio_score,
+                            state.audio_rms,
+                            state.audio_doa,
+                            state.audio_section,
+                            False,
+                        )
                         last_telemetry = motor.read_status()
                     event = "no_target"
                 elif frame_idx % 30 == 0:

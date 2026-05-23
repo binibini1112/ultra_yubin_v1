@@ -1,0 +1,23 @@
+{
+  "sample_rate": 16000,
+  "segment_sec": 1.0,
+  "n_mels": 64,
+  "n_fft": 1024,
+  "hop_length": 256,
+  "fmin": 50,
+  "fmax": 8000,
+  "input_shape": [
+    64,
+    63,
+    4
+  ],
+  "normalization": "train_dataset_mean_std_per_channel",
+  "class_to_angle": {
+    "0": 0,
+    "1": 60,
+    "2": 120,
+    "3": 180,
+    "4": 240,
+    "5": 300
+  }
+}

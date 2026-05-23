@@ -101,8 +101,8 @@ set +e
 ./run_jetson.sh --camera auto --conf "${YOLO_CONF}" "${pipeline_log_args[@]}" "$@"
 status=$?
 set -e
-if [ "${status}" -eq 134 ] || [ "${status}" -eq 139 ]; then
-  echo "[run_demo] ignored shutdown-only segfault after exit"
+if [ "${status}" -eq 134 ] || [ "${status}" -eq 135 ] || [ "${status}" -eq 139 ]; then
+  echo "[run_demo] ignored shutdown-only native crash after exit"
   exit 0
 fi
 exit "${status}"

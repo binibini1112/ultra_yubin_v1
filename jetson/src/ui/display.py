@@ -14,6 +14,7 @@ AMBER = (40, 190, 255)
 RED = (60, 70, 255)
 CYAN = (230, 190, 70)
 BLACK = (0, 0, 0)
+FONT_MAIN = cv2.FONT_HERSHEY_SIMPLEX
 
 
 class AntiDroneDisplay:
@@ -65,8 +66,12 @@ class AntiDroneDisplay:
             audio_detected = bool(self.state.audio_detected)
             audio_status = str(self.state.audio_status)
             audio_score = float(self.state.audio_score)
+            audio_rms = float(self.state.audio_rms)
             audio_doa = self.state.audio_doa
             audio_age = time.time() - self.state.audio_updated_at if self.state.audio_updated_at else 999.0
+            audio_last_detected_at = getattr(self.state, "audio_last_detected_at", 0.0)
+            audio_last_detection_doa = getattr(self.state, "audio_last_detection_doa", None)
+            audio_detection_age = time.time() - audio_last_detected_at if audio_last_detected_at else 999.0
 
         reticle_x = w // 2
         reticle_y = h // 2
@@ -92,8 +97,11 @@ class AntiDroneDisplay:
             audio_detected,
             audio_status,
             audio_score,
+            audio_rms,
             audio_doa,
             audio_age,
+            audio_detection_age,
+            audio_last_detection_doa,
             motor_info=motor_info,
             fire_status=fire_status,
         )
@@ -115,15 +123,25 @@ class AntiDroneDisplay:
         cv2.circle(frame, (cx, cy), 18, MUTED, 1, self.line_type)
 
     def _draw_laser_center_marker(self, frame, cx, cy):
-        gap = 34
-        arm = 76
-        color = GREEN
-        cv2.circle(frame, (cx, cy), 26, color, 2, self.line_type)
-        cv2.circle(frame, (cx, cy), 4, CYAN, -1, self.line_type)
-        cv2.line(frame, (cx - arm, cy), (cx - gap, cy), color, 2, self.line_type)
-        cv2.line(frame, (cx + gap, cy), (cx + arm, cy), color, 2, self.line_type)
-        cv2.line(frame, (cx, cy - arm), (cx, cy - gap), color, 2, self.line_type)
-        cv2.line(frame, (cx, cy + gap), (cx, cy + arm), color, 2, self.line_type)
+        gap = 22
+        arm = 20
+        color = WHITE
+        shadow = BLACK
+        thickness = 2
+        segments = [
+            ((cx - gap - arm, cy - gap), (cx - gap, cy - gap)),
+            ((cx - gap, cy - gap - arm), (cx - gap, cy - gap)),
+            ((cx + gap, cy - gap), (cx + gap + arm, cy - gap)),
+            ((cx + gap, cy - gap - arm), (cx + gap, cy - gap)),
+            ((cx - gap - arm, cy + gap), (cx - gap, cy + gap)),
+            ((cx - gap, cy + gap), (cx - gap, cy + gap + arm)),
+            ((cx + gap, cy + gap), (cx + gap + arm, cy + gap)),
+            ((cx + gap, cy + gap), (cx + gap, cy + gap + arm)),
+        ]
+        for start, end in segments:
+            cv2.line(frame, start, end, shadow, thickness + 2, self.line_type)
+        for start, end in segments:
+            cv2.line(frame, start, end, color, thickness, self.line_type)
 
     def _draw_target_box(self, frame, target):
         if not target:
@@ -131,16 +149,35 @@ class AntiDroneDisplay:
         x1, y1, x2, y2 = [int(v) for v in target["box"]]
         conf = float(target.get("conf", 0.0))
         color = GREEN if conf >= 0.60 else AMBER
-        cv2.rectangle(frame, (x1, y1), (x2, y2), BLACK, 5, self.line_type)
-        cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2, self.line_type)
+        self._corner_box(frame, x1, y1, x2, y2, color)
         cx = (x1 + x2) // 2
         cy = (y1 + y2) // 2
         if getattr(config, "UI_SHOW_BBOX_CROSSHAIR", True):
             cv2.line(frame, (cx - 12, cy), (cx + 12, cy), color, 2, self.line_type)
             cv2.line(frame, (cx, cy - 12), (cx, cy + 12), color, 2, self.line_type)
         if getattr(config, "UI_SHOW_BBOX_LABEL", True):
-            label = f"DRONE {conf:.2f}"
+            label = f"DRONE {max(0, min(100, int(round(conf * 100))))}%"
             self._label(frame, label, x1, max(26, y1 - 8), color)
+
+    def _corner_box(self, frame, x1, y1, x2, y2, color):
+        w = max(1, x2 - x1)
+        h = max(1, y2 - y1)
+        length = max(14, min(34, int(min(w, h) * 0.32)))
+        thickness = 2
+        segments = [
+            ((x1, y1), (x1 + length, y1)),
+            ((x1, y1), (x1, y1 + length)),
+            ((x2, y1), (x2 - length, y1)),
+            ((x2, y1), (x2, y1 + length)),
+            ((x1, y2), (x1 + length, y2)),
+            ((x1, y2), (x1, y2 - length)),
+            ((x2, y2), (x2 - length, y2)),
+            ((x2, y2), (x2, y2 - length)),
+        ]
+        for start, end in segments:
+            cv2.line(frame, start, end, BLACK, thickness + 2, self.line_type)
+        for start, end in segments:
+            cv2.line(frame, start, end, color, thickness, self.line_type)
 
     def _draw_fire_bbox(self, frame, fire_status):
         if not fire_status or not fire_status.get("fire_active"):
@@ -155,30 +192,37 @@ class AntiDroneDisplay:
         cv2.rectangle(frame, (x1, y1), (x2, y2), AMBER, 2, self.line_type)
 
     def _draw_top_status(self, frame, fps, state, target, audio_detected,
-                         audio_status, audio_score, audio_doa, audio_age,
+                         audio_status, audio_score, audio_rms, audio_doa, audio_age,
+                         audio_detection_age=999.0, audio_last_detection_doa=None,
                          motor_info=None, fire_status=None):
         h, w = frame.shape[:2]
         cv2.rectangle(frame, (0, 0), (w, 40), BLACK, -1)
-        vision_text = "DRONE DETECTED" if target else "SEARCHING"
+        vision_text = "LOCKED" if target else "SEARCHING"
         vision_color = GREEN if target else MUTED
         if state in (SystemState.TRACKING, SystemState.LOCKED):
             vision_text = state.value
             vision_color = GREEN if state == SystemState.LOCKED else CYAN
 
-        cv2.putText(frame, "CCTV", (14, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.65, WHITE, 1, self.line_type)
-        cv2.putText(frame, vision_text, (92, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.62, vision_color, 2, self.line_type)
+        cv2.putText(frame, "JETSON-FPGA DRONE TRACKER", (14, 26), FONT_MAIN, 0.50, WHITE, 1, self.line_type)
+        cv2.putText(frame, f"VISION: {vision_text}", (310, 26), FONT_MAIN, 0.52, vision_color, 1, self.line_type)
 
-        audio_fresh = audio_detected and audio_age < 2.0
+        audio_fresh = audio_detection_age < float(getattr(config, "UI_AUDIO_HOLD_SEC", 5.0))
         audio_color = AMBER if audio_fresh else MUTED
-        doa_text = "--" if audio_doa is None else f"{audio_doa:.0f}deg"
-        audio_text = f"AUDIO {'DETECT' if audio_fresh else 'LISTEN'} {audio_score:.2f} {doa_text}"
-        cv2.putText(frame, audio_text, (w - 390, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.55, audio_color, 1, self.line_type)
-        cv2.putText(frame, f"FPS {int(fps)}", (w - 88, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.50, MUTED, 1, self.line_type)
+        if audio_fresh:
+            held_doa = audio_last_detection_doa if audio_last_detection_doa is not None else audio_doa
+            doa_text = "" if held_doa is None else f" {held_doa:.0f}deg"
+            audio_text = f"AUDIO: FOUND{doa_text}"
+        else:
+            audio_text = "AUDIO: STANDBY"
+        (audio_tw, _), _ = cv2.getTextSize(audio_text, FONT_MAIN, 0.48, 1)
+        audio_x = max(500, w - 124 - audio_tw)
+        cv2.putText(frame, audio_text, (audio_x, 26), FONT_MAIN, 0.48, audio_color, 1, self.line_type)
+        cv2.putText(frame, f"FPS {int(fps)}", (w - 88, 26), FONT_MAIN, 0.48, MUTED, 1, self.line_type)
 
-        if audio_fresh and not target:
-            self._label(frame, "DRONE SOUND DETECTED", 14, h - 18, AMBER)
-        elif target:
-            self._label(frame, "VISION TRACKING", 14, h - 18, GREEN)
+        if target or state in (SystemState.TRACKING, SystemState.LOCKED):
+            self._label(frame, "MODE: VISION TRACKING", 14, h - 18, GREEN)
+        elif audio_fresh:
+            self._label(frame, "MODE: AUDIO SEARCH", 14, h - 18, AMBER)
         distance_mm = (motor_info or {}).get("distance_mm") if motor_info else None
         if distance_mm not in (None, ""):
             try:
@@ -195,29 +239,15 @@ class AntiDroneDisplay:
             self._label(frame, "MISS", max(14, w // 2 - 38), h - 18, MUTED)
 
     def _draw_motor_hint(self, frame, motor_info):
-        if not motor_info:
-            return
-        reply = str(motor_info.get("fpga_reply", ""))
-        if reply.startswith("SKIP,"):
-            text = reply[:42]
-            color = AMBER
-        elif reply.startswith("T,"):
-            text = "PL TRACK"
-            color = GREEN
-        elif reply.startswith("A,"):
-            text = "AUDIO PAN"
-            color = AMBER
-        else:
-            return
-        cv2.putText(frame, text, (14, 64), cv2.FONT_HERSHEY_SIMPLEX, 0.50, color, 1, self.line_type)
+        return
 
     def _label(self, frame, text, x, y, color):
-        (tw, th), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.56, 1)
+        (tw, th), _ = cv2.getTextSize(text, FONT_MAIN, 0.54, 1)
         x = max(0, min(frame.shape[1] - tw - 16, int(x)))
         y = max(th + 8, min(frame.shape[0] - 8, int(y)))
         cv2.rectangle(frame, (x, y - th - 8), (x + tw + 14, y + 5), BLACK, -1)
         cv2.rectangle(frame, (x, y - th - 8), (x + tw + 14, y + 5), color, 1, self.line_type)
-        cv2.putText(frame, text, (x + 7, y), cv2.FONT_HERSHEY_SIMPLEX, 0.56, color, 1, self.line_type)
+        cv2.putText(frame, text, (x + 7, y), FONT_MAIN, 0.54, color, 1, self.line_type)
 
     def _mouse_cb(self, event, x, y, flags, param):
         return
